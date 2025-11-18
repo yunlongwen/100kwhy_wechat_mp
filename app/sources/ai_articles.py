@@ -1,7 +1,11 @@
+import json
 from dataclasses import dataclass
 from datetime import datetime
+from pathlib import Path
 from random import sample
 from typing import List, Optional
+
+from loguru import logger
 
 
 @dataclass
@@ -12,52 +16,57 @@ class AiArticle:
     summary: str
 
 
+def _config_path() -> Path:
+    """
+    Get path to config/ai_articles.json relative to project root.
+    """
+    # app/sources/ai_articles.py -> project_root/config/ai_articles.json
+    return Path(__file__).resolve().parents[2] / "config" / "ai_articles.json"
+
+
 def load_ai_articles_pool() -> List[AiArticle]:
     """
-    Placeholder: load a pool of high-quality AI coding articles.
+    Load a pool of high-quality AI coding articles from JSON config file.
 
-    For now this is hard-coded. Later you can:
-      - load from database
-      - or from a JSON/CSV file maintained by your curation workflow.
+    Config file: config/ai_articles.json
+    Structure:
+      [
+        {
+          "title": "...",
+          "url": "...",
+          "source": "...",
+          "summary": "..."
+        },
+        ...
+      ]
     """
-    return [
-        AiArticle(
-            title="用 AI 重构遗留代码的实战流程",
-            url="https://mp.weixin.qq.com/example1",
-            source="某AI编程公众号",
-            summary="介绍如何用大模型理解和重构复杂遗留代码，并控制风险。",
-        ),
-        AiArticle(
-            title="让代码评审更高效：AI + 模板化 Checklist",
-            url="https://mp.weixin.qq.com/example2",
-            source="某工程实践公众号",
-            summary="结合 AI 自动生成代码评审要点，减少无效 Review。",
-        ),
-        AiArticle(
-            title="在真实团队中落地 AI 代码生成的 5 个坑",
-            url="https://mp.weixin.qq.com/example3",
-            source="某工程管理公众号",
-            summary="分享 AI 代码生成在团队落地时的常见问题与对策。",
-        ),
-        AiArticle(
-            title="从提示到工作流：用 AI 改造你的开发流水线",
-            url="https://mp.weixin.qq.com/example4",
-            source="某AI工具公众号",
-            summary="不只写代码，而是把 AI 接入到整个开发工作流。",
-        ),
-        AiArticle(
-            title="如何让初级工程师安全地使用 AI 写代码",
-            url="https://mp.weixin.qq.com/example5",
-            source="某团队管理公众号",
-            summary="从规范、代码库保护和评审制度上给出实操建议。",
-        ),
-        AiArticle(
-            title="LLM 时代的代码质量保障：测试、静态检查与 AI",
-            url="https://mp.weixin.qq.com/example6",
-            source="某测试实践公众号",
-            summary="探讨如何在大量使用 AI 生成代码的前提下保证质量。",
-        ),
-    ]
+    path = _config_path()
+    if not path.exists():
+        logger.warning(f"AI articles config not found at {path}, return empty list.")
+        return []
+
+    try:
+        with path.open("r", encoding="utf-8") as f:
+            raw_items = json.load(f)
+    except Exception as exc:  # noqa: BLE001
+        logger.error(f"Failed to load AI articles config: {exc}")
+        return []
+
+    articles: List[AiArticle] = []
+    for item in raw_items:
+        try:
+            articles.append(
+                AiArticle(
+                    title=item.get("title", "").strip(),
+                    url=item.get("url", "").strip(),
+                    source=item.get("source", "").strip(),
+                    summary=item.get("summary", "").strip(),
+                )
+            )
+        except Exception as exc:  # noqa: BLE001
+            logger.error(f"Invalid article item in config: {item}, error: {exc}")
+
+    return articles
 
 
 def pick_daily_ai_articles(k: int = 5) -> List[AiArticle]:
