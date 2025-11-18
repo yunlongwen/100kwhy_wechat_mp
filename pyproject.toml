@@ -1,0 +1,23 @@
+[tool.poetry]
+name = "100kwhy-wechat-mp"
+version = "0.1.0"
+description = "WeChat official account backend and content pipeline for AI coding & engineering management."
+authors = ["Yunlong <you@example.com>"]
+
+[tool.poetry.dependencies]
+python = "^3.10"
+fastapi = "^0.115.0"
+uvicorn = {extras = ["standard"], version = "^0.30.0"}
+python-dotenv = "^1.0.1"
+httpx = "^0.27.0"
+apscheduler = "^3.10.4"
+loguru = "^0.7.2"
+
+[tool.poetry.dev-dependencies]
+pytest = "^8.0.0"
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+
