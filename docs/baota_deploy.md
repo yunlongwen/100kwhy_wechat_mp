@@ -18,13 +18,6 @@ cat > env.sh << 'EOF'
 # 企业微信群机器人 Webhook 地址
 export WECOM_WEBHOOK="https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=替换成你的key"
 
-# 日报推送时间（24 小时制，可选，默认 14:00）
-export DAILY_DIGEST_HOUR=14
-export DAILY_DIGEST_MINUTE=0
-
-# 每天推送的文章数量（可选，默认 5 篇）
-export DAILY_DIGEST_COUNT=5
-
 # 如果后续接入微信公众号，可在这里一起配置
 # export WECHAT_TOKEN="your_wechat_token"
 EOF
@@ -101,30 +94,37 @@ python -m uvicorn app.main:app --host 0.0.0.0 --port 8000
 
 ---
 
-### 四、定时任务参数配置
+### 四、定时任务参数配置（config/digest_schedule.json）
 
-定时任务由 `app/main.py` 中的 `AsyncIOScheduler` 管理，启动时会读取以下环境变量：
+定时任务由 `app/main.py` 中的 `AsyncIOScheduler` 管理，启动时会从配置文件读取参数：
 
-- `DAILY_DIGEST_HOUR`：每日推送小时（0–23，默认 `14`）
-- `DAILY_DIGEST_MINUTE`：每日推送分钟（0–59，默认 `0`）
-- `DAILY_DIGEST_COUNT`：每天推送的文章数量（默认 `5`）
+配置文件路径：`config/digest_schedule.json`
 
-配置方式：
+示例内容：
 
-- 在 `env.sh` 中按前文示例设置好以上变量；
-- 在宝塔中重启 Python 项目；
-- 启动日志中会打印类似信息：
+```json
+{
+  "hour": 14,
+  "minute": 0,
+  "count": 5
+}
+```
+
+- `hour`：每日推送小时（0–23，默认 `14`）
+- `minute`：每日推送分钟（0–59，默认 `0`）
+- `count`：每天推送的文章数量（默认 `5`）
+
+修改方式：
+
+1. 编辑服务器上的 `config/digest_schedule.json`；
+2. 在宝塔中重启 Python 项目；
+3. 启动日志中会打印类似信息：
 
 ```text
 Scheduler started. Daily digest will be sent at 14:00 (Asia/Shanghai), with up to 5 articles.
 ```
 
-如果需要临时调整时间，例如改为当下时间之后几分钟测试，可以：
-
-1. 修改 `env.sh` 里的 `DAILY_DIGEST_HOUR` / `DAILY_DIGEST_MINUTE`；
-2. `source env.sh`（可选）并在宝塔中重启项目；
-3. 等待指定时间，看企业微信群是否收到消息；
-4. 测试完后改回正式时间，再重启项目。
+如果需要临时调整时间（例如改为当前时间之后几分钟测试），只需修改配置文件并重启项目即可。
 
 ---
 
@@ -160,4 +160,30 @@ EOF
 ```
 
 若企业微信群收到消息，则说明手动触发和自动定时任务公用的链路已经通畅；后续只需要依赖定时任务即可。
+
+---
+
+### 六、前端管理页面：预览 & 一键触发
+
+项目内置了一个简单的管理页面，用于：
+
+- 预览当前配置下将要推送的文章列表；
+- 手动触发一次企业微信推送；
+- 查看当前定时任务时间与篇数配置。
+
+访问方式（假设服务运行在 8000 端口）：
+
+- 在浏览器访问：`http://服务器IP:8000/digest/panel`
+
+页面功能说明：
+
+- 打开页面时，会自动调用 `GET /digest/preview`，展示：
+  - 日期、主题
+  - 当前定时配置（小时、分钟、篇数）
+  - 本次将要推送的文章列表（标题、来源、摘要）
+- 点击「手动触发一次推送到企业微信群」按钮时：
+  - 会调用 `POST /digest/trigger`
+  - 成功后页面会显示「已触发一次推送：YYYY-MM-DD ｜ 主题：...」
+
+> 注意：管理页面不会做登录鉴权，默认只在你自己的内网/服务器环境上使用，如需对外开放建议加一层反向代理或认证。
 

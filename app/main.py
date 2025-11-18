@@ -1,29 +1,18 @@
 from contextlib import asynccontextmanager
 from datetime import datetime
-import os
 from typing import Optional
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from fastapi import FastAPI
 from loguru import logger
 
+from .config_loader import load_digest_schedule
 from .notifier.wecom import build_wecom_digest_markdown, send_markdown_to_wecom
-from .routes import wechat
+from .routes import wechat, digest
 from .sources.ai_articles import pick_daily_ai_articles, todays_theme
 
 # 全局 scheduler 实例
 scheduler: Optional[AsyncIOScheduler] = None
-
-
-def _get_int_env(name: str, default: int) -> int:
-    raw = os.getenv(name)
-    if raw is None:
-        return default
-    try:
-        return int(raw)
-    except ValueError:
-        logger.warning(f"Invalid int value for env {name}={raw!r}, fallback to {default}.")
-        return default
 
 
 @asynccontextmanager
@@ -31,9 +20,11 @@ async def lifespan(app: FastAPI):
     """应用生命周期管理：启动时启动 scheduler，关闭时关闭 scheduler"""
     global scheduler
 
-    digest_hour = _get_int_env("DAILY_DIGEST_HOUR", 14)
-    digest_minute = _get_int_env("DAILY_DIGEST_MINUTE", 0)
-    digest_count = _get_int_env("DAILY_DIGEST_COUNT", 5)
+    # 从配置文件加载定时任务参数
+    schedule = load_digest_schedule()
+    digest_hour = schedule.hour
+    digest_minute = schedule.minute
+    digest_count = schedule.count
 
     # 启动时
     scheduler = AsyncIOScheduler(timezone="Asia/Shanghai")
@@ -87,6 +78,7 @@ def create_app() -> FastAPI:
     )
 
     app.include_router(wechat.router, prefix="/wechat", tags=["wechat"])
+    app.include_router(digest.router, prefix="/digest", tags=["digest"])
 
     return app
 
