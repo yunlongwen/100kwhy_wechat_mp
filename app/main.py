@@ -14,7 +14,12 @@ from typing import Optional
 from dotenv import load_dotenv
 
 # 在所有模块导入前，从 .env 文件加载环境变量
-load_dotenv()
+# 添加错误处理，避免 .env 文件格式错误导致启动失败
+try:
+    load_dotenv()
+except Exception as e:  # noqa: BLE001
+    # logger 还未导入，使用 print 输出警告
+    print(f"Warning: Failed to load .env file: {e}. Continuing with environment variables...")
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
