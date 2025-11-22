@@ -106,4 +106,96 @@ class WeChatMPClient:
         except Exception as e:
             logger.error(f"发布异常: {e}")
             return False
+    
+    async def get_draft_list(self, offset: int = 0, count: int = 20) -> Optional[Dict[str, Any]]:
+        """获取草稿箱列表"""
+        token = await self.get_access_token()
+        if not token:
+            return None
+        
+        try:
+            url = f"https://api.weixin.qq.com/cgi-bin/draft/batchget?access_token={token}"
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                resp = await client.post(url, json={
+                    "offset": offset,
+                    "count": count,
+                    "no_content": 0  # 返回内容
+                })
+                data = resp.json()
+                
+                if "item" in data:
+                    return data
+                else:
+                    logger.error(f"获取草稿列表失败: {data}")
+                    return None
+        except Exception as e:
+            logger.error(f"获取草稿列表异常: {e}")
+            return None
+    
+    async def get_draft(self, media_id: str) -> Optional[Dict[str, Any]]:
+        """获取草稿详情"""
+        token = await self.get_access_token()
+        if not token:
+            return None
+        
+        try:
+            url = f"https://api.weixin.qq.com/cgi-bin/draft/get?access_token={token}"
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                resp = await client.post(url, json={"media_id": media_id})
+                data = resp.json()
+                
+                if "news_item" in data:
+                    return data
+                else:
+                    logger.error(f"获取草稿详情失败: {data}")
+                    return None
+        except Exception as e:
+            logger.error(f"获取草稿详情异常: {e}")
+            return None
+    
+    async def update_draft(self, media_id: str, index: int, article: Dict[str, Any]) -> bool:
+        """更新草稿中的单篇文章"""
+        token = await self.get_access_token()
+        if not token:
+            return False
+        
+        try:
+            url = f"https://api.weixin.qq.com/cgi-bin/draft/update?access_token={token}"
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                resp = await client.post(url, json={
+                    "media_id": media_id,
+                    "index": index,
+                    "articles": article
+                })
+                data = resp.json()
+                
+                if data.get("errcode") == 0:
+                    return True
+                else:
+                    logger.error(f"更新草稿失败: {data}")
+                    return False
+        except Exception as e:
+            logger.error(f"更新草稿异常: {e}")
+            return False
+    
+    async def delete_draft(self, media_id: str) -> bool:
+        """删除草稿"""
+        token = await self.get_access_token()
+        if not token:
+            return False
+        
+        try:
+            url = f"https://api.weixin.qq.com/cgi-bin/draft/delete?access_token={token}"
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                resp = await client.post(url, json={"media_id": media_id})
+                data = resp.json()
+                
+                if data.get("errcode") == 0:
+                    return True
+                else:
+                    logger.error(f"删除草稿失败: {data}")
+                    return False
+        except Exception as e:
+            logger.error(f"删除草稿异常: {e}")
+            return False
 

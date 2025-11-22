@@ -676,6 +676,153 @@ async def publish_digest_to_wechat_mp(admin: None = Depends(_require_admin)):
         raise HTTPException(status_code=500, detail=f"发布失败: {str(e)}")
 
 
+@router.get("/wechat-mp/drafts")
+async def get_wechat_mp_drafts(offset: int = 0, count: int = 20, admin: None = Depends(_require_admin)):
+    """获取微信公众号草稿箱列表"""
+    try:
+        client = WeChatMPClient()
+        result = await client.get_draft_list(offset=offset, count=count)
+        
+        if result:
+            return {
+                "ok": True,
+                "total_count": result.get("total_count", 0),
+                "item_count": result.get("item_count", 0),
+                "drafts": result.get("item", [])
+            }
+        else:
+            raise HTTPException(status_code=500, detail="获取草稿列表失败")
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"获取草稿列表失败: {e}")
+        raise HTTPException(status_code=500, detail=f"获取草稿列表失败: {str(e)}")
+
+
+@router.get("/wechat-mp/draft/{media_id}")
+async def get_wechat_mp_draft(media_id: str, admin: None = Depends(_require_admin)):
+    """获取微信公众号草稿详情"""
+    try:
+        client = WeChatMPClient()
+        result = await client.get_draft(media_id)
+        
+        if result:
+            return {
+                "ok": True,
+                "draft": result
+            }
+        else:
+            raise HTTPException(status_code=500, detail="获取草稿详情失败")
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"获取草稿详情失败: {e}")
+        raise HTTPException(status_code=500, detail=f"获取草稿详情失败: {str(e)}")
+
+
+@router.post("/wechat-mp/draft/{media_id}/update")
+async def update_wechat_mp_draft(media_id: str, request: dict, admin: None = Depends(_require_admin)):
+    """更新微信公众号草稿"""
+    index = request.get("index", 0)
+    article = request.get("article")
+    
+    if not article:
+        raise HTTPException(status_code=400, detail="请提供文章数据")
+    
+    try:
+        client = WeChatMPClient()
+        success = await client.update_draft(media_id, index, article)
+        
+        if success:
+            return {
+                "ok": True,
+                "message": "草稿更新成功"
+            }
+        else:
+            raise HTTPException(status_code=500, detail="更新草稿失败")
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"更新草稿失败: {e}")
+        raise HTTPException(status_code=500, detail=f"更新草稿失败: {str(e)}")
+
+
+@router.post("/wechat-mp/draft/{media_id}/delete")
+async def delete_wechat_mp_draft(media_id: str, admin: None = Depends(_require_admin)):
+    """删除微信公众号草稿"""
+    try:
+        client = WeChatMPClient()
+        success = await client.delete_draft(media_id)
+        
+        if success:
+            return {
+                "ok": True,
+                "message": "草稿删除成功"
+            }
+        else:
+            raise HTTPException(status_code=500, detail="删除草稿失败")
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"删除草稿失败: {e}")
+        raise HTTPException(status_code=500, detail=f"删除草稿失败: {str(e)}")
+
+
+@router.post("/wechat-mp/create-draft-from-articles")
+async def create_draft_from_articles(request: dict, admin: None = Depends(_require_admin)):
+    """从文章池创建微信公众号草稿"""
+    article_ids = request.get("article_ids", [])
+    
+    if not article_ids:
+        raise HTTPException(status_code=400, detail="请选择要发布的文章")
+    
+    try:
+        # 获取文章数据
+        all_articles_data = get_all_articles()
+        if not all_articles_data or not all_articles_data.get("articles"):
+            raise HTTPException(status_code=400, detail="文章池为空")
+        
+        # 根据 URL 匹配文章（因为文章池使用 URL 作为唯一标识）
+        selected_articles = []
+        for article in all_articles_data["articles"]:
+            if article.get("url") in article_ids:
+                selected_articles.append(article)
+        
+        if not selected_articles:
+            raise HTTPException(status_code=400, detail="未找到选中的文章")
+        
+        # 转换为微信公众号格式
+        wechat_articles = []
+        for article in selected_articles[:8]:  # 最多8篇
+            wechat_articles.append({
+                "title": article.get("title", "无标题"),
+                "author": article.get("source", "未知"),
+                "digest": (article.get("summary", "") or "")[:120],
+                "content": f"<p>{article.get('summary', '') or ''}</p><p><a href='{article.get('url', '')}'>阅读原文</a></p>",
+                "content_source_url": article.get("url", ""),
+                "thumb_media_id": "",  # 可选：封面图
+                "show_cover_pic": 1,
+            })
+        
+        # 创建草稿
+        client = WeChatMPClient()
+        media_id = await client.create_draft(wechat_articles)
+        
+        if media_id:
+            return {
+                "ok": True,
+                "media_id": media_id,
+                "message": f"已成功创建草稿，包含 {len(wechat_articles)} 篇文章"
+            }
+        else:
+            raise HTTPException(status_code=500, detail="创建草稿失败")
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"从文章池创建草稿失败: {e}")
+        raise HTTPException(status_code=500, detail=f"创建草稿失败: {str(e)}")
+
+
 @router.get("/panel", response_class=HTMLResponse)
 async def digest_panel():
     """
@@ -863,6 +1010,94 @@ async def digest_panel():
           font-size: 14px;
           box-sizing: border-box;
         }
+        .draft-actions {
+          display: flex;
+          gap: 10px;
+          margin-bottom: 12px;
+        }
+        .drafts-list {
+          margin-top: 16px;
+        }
+        .draft-item {
+          background: #ffffff;
+          border-radius: 12px;
+          padding: 16px;
+          margin-bottom: 12px;
+          box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+          border: 1px solid #e5e7eb;
+        }
+        .draft-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin-bottom: 12px;
+        }
+        .draft-title {
+          font-weight: 600;
+          font-size: 16px;
+          color: #111827;
+        }
+        .draft-meta {
+          font-size: 12px;
+          color: #6b7280;
+          margin-top: 4px;
+        }
+        .draft-articles {
+          margin-top: 12px;
+        }
+        .draft-article-item {
+          padding: 8px;
+          background: #f9fafb;
+          border-radius: 6px;
+          margin-bottom: 8px;
+        }
+        .draft-article-item strong {
+          color: #111827;
+        }
+        .draft-actions-btns {
+          display: flex;
+          gap: 8px;
+          margin-top: 12px;
+        }
+        .draft-modal {
+          display: none;
+          position: fixed;
+          inset: 0;
+          background: rgba(15, 23, 42, 0.45);
+          align-items: center;
+          justify-content: center;
+          z-index: 70;
+        }
+        .draft-modal.is-visible {
+          display: flex;
+        }
+        .draft-modal-content {
+          width: min(800px, 95vw);
+          max-height: 90vh;
+          overflow-y: auto;
+          background: #fff;
+          border-radius: 20px;
+          padding: 24px;
+          box-shadow: 0 25px 45px rgba(15, 23, 42, 0.25);
+          position: relative;
+        }
+        .draft-edit-form {
+          margin-top: 16px;
+        }
+        .draft-edit-form input,
+        .draft-edit-form textarea {
+          width: 100%;
+          padding: 8px 12px;
+          border: 1px solid #d1d5db;
+          border-radius: 6px;
+          font-size: 14px;
+          box-sizing: border-box;
+          margin-bottom: 12px;
+        }
+        .draft-edit-form textarea {
+          min-height: 100px;
+          font-family: inherit;
+        }
       </style>
     </head>
     <body>
@@ -909,6 +1144,14 @@ async def digest_panel():
       <div id="articles"></div>
       <button id="trigger-btn">手动触发一次推送到企业微信群</button>
       <div class="status" id="status"></div>
+
+      <h2>微信公众号草稿箱</h2>
+      <div class="draft-actions">
+        <button id="create-draft-btn" class="btn-success">从文章池创建草稿</button>
+        <button id="refresh-drafts-btn" class="btn-secondary">刷新草稿列表</button>
+      </div>
+      <div class="status" id="drafts-status"></div>
+      <div class="drafts-list" id="drafts-list">加载中...</div>
 
 
 
@@ -1016,6 +1259,14 @@ async def digest_panel():
             </div>
             <div class="status" id="config-env-status"></div>
           </div>
+        </div>
+      </div>
+
+      <div class="draft-modal" id="draft-edit-modal">
+        <div class="draft-modal-content">
+          <button class="config-modal-close" id="close-draft-edit-btn">&times;</button>
+          <h2>编辑草稿</h2>
+          <div id="draft-edit-content"></div>
         </div>
       </div>
 
@@ -2071,8 +2322,410 @@ async def digest_panel():
         document.getElementById("save-template-btn").addEventListener("click", saveWecomTemplateConfig);
         document.getElementById("save-env-btn").addEventListener("click", saveEnvConfig);
 
+        // 微信公众号草稿箱功能
+        async function loadDraftsList() {
+          const listEl = document.getElementById("drafts-list");
+          const statusEl = document.getElementById("drafts-status");
+          
+          if (!listEl) return;
+          
+          if (statusEl) statusEl.textContent = "";
+          listEl.innerHTML = "加载中...";
+          
+          try {
+            const adminCode = getAdminCode();
+            const res = await fetch("./wechat-mp/drafts?offset=0&count=20", {
+              headers: { "X-Admin-Code": adminCode || "" }
+            });
+            
+            if (res.status === 401 || res.status === 403) {
+              handleAuthError(statusEl);
+              listEl.innerHTML = "<p>需要授权</p>";
+              return;
+            }
+            
+            if (!res.ok) {
+              throw new Error("HTTP " + res.status);
+            }
+            
+            const data = await res.json();
+            if (data.ok && data.drafts) {
+              if (data.drafts.length === 0) {
+                listEl.innerHTML = "<p>草稿箱为空</p>";
+                return;
+              }
+              
+              listEl.innerHTML = "";
+              data.drafts.forEach(function(draft) {
+                const mediaId = draft.media_id || draft.media_id;
+                const content = draft.content || {};
+                const newsItem = content.news_item || [];
+                const createTime = content.create_time ? new Date(content.create_time * 1000).toLocaleString() : "未知";
+                
+                const draftDiv = document.createElement("div");
+                draftDiv.className = "draft-item";
+                draftDiv.innerHTML = `
+                  <div class="draft-header">
+                    <div>
+                      <div class="draft-title">草稿 #${mediaId.substring(0, 8)}...</div>
+                      <div class="draft-meta">创建时间: ${createTime} | 文章数: ${newsItem.length}</div>
+                    </div>
+                  </div>
+                  <div class="draft-articles">
+                    ${newsItem.map(function(article, idx) {
+                      const title = (article.title || "无标题").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+                      const author = (article.author || "未知").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+                      const url = article.content_source_url || "#";
+                      return `
+                        <div class="draft-article-item">
+                          <strong>${idx + 1}. ${title}</strong>
+                          <div style="font-size: 12px; color: #6b7280; margin-top: 4px;">
+                            作者: ${author} | 
+                            <a href="${url}" target="_blank">原文链接</a>
+                          </div>
+                        </div>
+                      `;
+                    }).join("")}
+                  </div>
+                  <div class="draft-actions-btns">
+                    <button class="btn-success" data-action="edit" data-media-id="${mediaId}">编辑</button>
+                    <button class="btn-primary" data-action="publish" data-media-id="${mediaId}">发布</button>
+                    <button class="btn-secondary" data-action="delete" data-media-id="${mediaId}">删除</button>
+                  </div>
+                `;
+                listEl.appendChild(draftDiv);
+              });
+            } else {
+              listEl.innerHTML = "<p>加载失败</p>";
+            }
+          } catch (err) {
+            console.error("加载草稿列表失败:", err);
+            listEl.innerHTML = "<p>加载失败: " + err.message + "</p>";
+          }
+        }
+
+        async function createDraftFromArticles() {
+          const statusEl = document.getElementById("drafts-status");
+          const articlesData = await fetch("./articles", {
+            headers: { "X-Admin-Code": getAdminCode() || "" }
+          }).then(r => r.json());
+          
+          if (!articlesData.ok || !articlesData.articles || articlesData.articles.length === 0) {
+            if (statusEl) {
+              statusEl.textContent = "❌ 文章池为空，请先添加文章";
+              statusEl.className = "status error";
+            }
+            return;
+          }
+          
+          // 让用户选择文章（简化版：使用所有文章）
+          const articleUrls = articlesData.articles.map(a => a.url);
+          
+          if (statusEl) {
+            statusEl.textContent = "正在创建草稿...";
+            statusEl.className = "status";
+          }
+          
+          try {
+            const adminCode = getAdminCode();
+            const res = await fetch("./wechat-mp/create-draft-from-articles", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "X-Admin-Code": adminCode || ""
+              },
+              body: JSON.stringify({ article_ids: articleUrls })
+            });
+            
+            if (res.status === 401 || res.status === 403) {
+              handleAuthError(statusEl);
+              return;
+            }
+            
+            if (!res.ok) {
+              throw new Error("HTTP " + res.status);
+            }
+            
+            const data = await res.json();
+            if (data.ok) {
+              if (statusEl) {
+                statusEl.textContent = "✅ " + data.message;
+                statusEl.className = "status success";
+              }
+              loadDraftsList();
+            } else {
+              throw new Error(data.message || "创建失败");
+            }
+          } catch (err) {
+            console.error("创建草稿失败:", err);
+            if (statusEl) {
+              statusEl.textContent = "❌ 创建失败: " + err.message;
+              statusEl.className = "status error";
+            }
+          }
+        }
+
+        window.editDraft = async function(mediaId) {
+          const modal = document.getElementById("draft-edit-modal");
+          const contentEl = document.getElementById("draft-edit-content");
+          
+          if (!modal || !contentEl) return;
+          
+          try {
+            const adminCode = getAdminCode();
+            const res = await fetch(`./wechat-mp/draft/${mediaId}`, {
+              headers: { "X-Admin-Code": adminCode || "" }
+            });
+            
+            if (!res.ok) {
+              throw new Error("HTTP " + res.status);
+            }
+            
+            const data = await res.json();
+            if (data.ok && data.draft) {
+              const draft = data.draft;
+              const newsItem = draft.news_item || [];
+              
+              if (newsItem.length === 0) {
+                contentEl.innerHTML = "<p>草稿中没有文章</p>";
+                modal.classList.add("is-visible");
+                return;
+              }
+              
+              contentEl.innerHTML = newsItem.map(function(article, idx) {
+                const title = (article.title || "").replace(/"/g, "&quot;").replace(/&/g, "&amp;");
+                const author = (article.author || "").replace(/"/g, "&quot;").replace(/&/g, "&amp;");
+                const digest = (article.digest || "").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/&/g, "&amp;");
+                const content = (article.content || "").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/&/g, "&amp;");
+                const url = (article.content_source_url || "").replace(/"/g, "&quot;").replace(/&/g, "&amp;");
+                
+                return `
+                  <div class="draft-edit-form">
+                    <h3>文章 ${idx + 1}</h3>
+                    <label>标题</label>
+                    <input type="text" id="draft-title-${idx}" value="${title}" placeholder="标题" />
+                    <label>作者</label>
+                    <input type="text" id="draft-author-${idx}" value="${author}" placeholder="作者" />
+                    <label>摘要（120字以内）</label>
+                    <textarea id="draft-digest-${idx}" placeholder="摘要（120字以内）">${digest}</textarea>
+                    <label>内容（HTML格式）</label>
+                    <textarea id="draft-content-${idx}" placeholder="内容（HTML格式）" style="min-height: 200px;">${content}</textarea>
+                    <label>原文链接</label>
+                    <input type="text" id="draft-url-${idx}" value="${url}" placeholder="原文链接" />
+                  </div>
+                `;
+              }).join("");
+              
+              contentEl.innerHTML += `
+                <div class="form-actions" style="margin-top: 20px;">
+                  <button class="btn-success" data-save-draft="${mediaId}">保存修改</button>
+                  <button class="btn-secondary" onclick="closeDraftEdit()">取消</button>
+                </div>
+              `;
+              
+              // 绑定保存按钮
+              const saveBtn = contentEl.querySelector(`[data-save-draft="${mediaId}"]`);
+              if (saveBtn) {
+                saveBtn.addEventListener("click", function() {
+                  saveDraftEdit(mediaId);
+                });
+              }
+              
+              modal.classList.add("is-visible");
+            }
+          } catch (err) {
+            console.error("加载草稿详情失败:", err);
+            alert("加载草稿详情失败: " + err.message);
+          }
+        }
+
+        window.saveDraftEdit = async function(mediaId) {
+          const contentEl = document.getElementById("draft-edit-content");
+          if (!contentEl) return;
+          
+          const forms = contentEl.querySelectorAll(".draft-edit-form");
+          const articles = [];
+          
+          forms.forEach(function(form, idx) {
+            const title = document.getElementById(`draft-title-${idx}`).value;
+            const author = document.getElementById(`draft-author-${idx}`).value;
+            const digest = document.getElementById(`draft-digest-${idx}`).value;
+            const content = document.getElementById(`draft-content-${idx}`).value;
+            const url = document.getElementById(`draft-url-${idx}`).value;
+            
+            articles.push({
+              title: title,
+              author: author,
+              digest: digest,
+              content: content,
+              content_source_url: url,
+              thumb_media_id: "",
+              show_cover_pic: 1,
+            });
+          });
+          
+          try {
+            const adminCode = getAdminCode();
+            // 更新每篇文章
+            for (let i = 0; i < articles.length; i++) {
+              const res = await fetch(`./wechat-mp/draft/${mediaId}/update`, {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  "X-Admin-Code": adminCode || ""
+                },
+                body: JSON.stringify({
+                  index: i,
+                  article: articles[i]
+                })
+              });
+              
+              if (!res.ok) {
+                throw new Error("更新失败");
+              }
+            }
+            
+            alert("草稿更新成功！");
+            closeDraftEdit();
+            loadDraftsList();
+          } catch (err) {
+            console.error("保存草稿失败:", err);
+            alert("保存失败: " + err.message);
+          }
+        }
+
+        window.closeDraftEdit = function() {
+          const modal = document.getElementById("draft-edit-modal");
+          if (modal) {
+            modal.classList.remove("is-visible");
+          }
+        }
+
+        window.publishDraft = async function(mediaId) {
+          if (!confirm("确定要发布这个草稿吗？")) {
+            return;
+          }
+          
+          const statusEl = document.getElementById("drafts-status");
+          if (statusEl) {
+            statusEl.textContent = "正在发布...";
+            statusEl.className = "status";
+          }
+          
+          try {
+            const adminCode = getAdminCode();
+            const res = await fetch(`./wechat-mp/publish`, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "X-Admin-Code": adminCode || ""
+              },
+              body: JSON.stringify({ media_id: mediaId })
+            });
+            
+            if (res.status === 401 || res.status === 403) {
+              handleAuthError(statusEl);
+              return;
+            }
+            
+            if (!res.ok) {
+              throw new Error("HTTP " + res.status);
+            }
+            
+            const data = await res.json();
+            if (data.ok) {
+              if (statusEl) {
+                statusEl.textContent = "✅ 发布成功！";
+                statusEl.className = "status success";
+              }
+              loadDraftsList();
+            } else {
+              throw new Error(data.message || "发布失败");
+            }
+          } catch (err) {
+            console.error("发布草稿失败:", err);
+            if (statusEl) {
+              statusEl.textContent = "❌ 发布失败: " + err.message;
+              statusEl.className = "status error";
+            }
+          }
+        }
+
+        window.deleteDraft = async function(mediaId) {
+          if (!confirm("确定要删除这个草稿吗？")) {
+            return;
+          }
+          
+          try {
+            const adminCode = getAdminCode();
+            const res = await fetch(`./wechat-mp/draft/${mediaId}/delete`, {
+              method: "POST",
+              headers: { "X-Admin-Code": adminCode || "" }
+            });
+            
+            if (!res.ok) {
+              throw new Error("HTTP " + res.status);
+            }
+            
+            const data = await res.json();
+            if (data.ok) {
+              loadDraftsList();
+            } else {
+              throw new Error(data.message || "删除失败");
+            }
+          } catch (err) {
+            console.error("删除草稿失败:", err);
+            alert("删除失败: " + err.message);
+          }
+        }
+
+        // 绑定草稿箱按钮事件
+        const createDraftBtn = document.getElementById("create-draft-btn");
+        const refreshDraftsBtn = document.getElementById("refresh-drafts-btn");
+        const closeDraftEditBtn = document.getElementById("close-draft-edit-btn");
+        const draftEditModal = document.getElementById("draft-edit-modal");
+        
+        if (createDraftBtn) {
+          createDraftBtn.addEventListener("click", createDraftFromArticles);
+        }
+        if (refreshDraftsBtn) {
+          refreshDraftsBtn.addEventListener("click", loadDraftsList);
+        }
+        if (closeDraftEditBtn) {
+          closeDraftEditBtn.addEventListener("click", closeDraftEdit);
+        }
+        if (draftEditModal) {
+          draftEditModal.addEventListener("click", function(event) {
+            if (event.target.id === "draft-edit-modal") {
+              closeDraftEdit();
+            }
+          });
+        }
+        
+        // 使用事件委托处理草稿操作按钮
+        const draftsList = document.getElementById("drafts-list");
+        if (draftsList) {
+          draftsList.addEventListener("click", function(event) {
+            const btn = event.target;
+            if (btn.hasAttribute("data-action")) {
+              const action = btn.getAttribute("data-action");
+              const mediaId = btn.getAttribute("data-media-id");
+              if (action === "edit") {
+                editDraft(mediaId);
+              } else if (action === "publish") {
+                publishDraft(mediaId);
+              } else if (action === "delete") {
+                deleteDraft(mediaId);
+              }
+            }
+          });
+        }
+
         // 初始加载：检查是否已有授权码，没有则弹出对话框
         initializePanel();
+        
+        // 加载草稿列表
+        loadDraftsList();
       </script>
     </body>
     </html>
