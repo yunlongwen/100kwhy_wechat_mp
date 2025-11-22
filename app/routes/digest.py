@@ -28,6 +28,10 @@ from ..sources.ai_articles import (
     save_article_to_config,
     todays_theme,
 )
+from ..sources.article_sources import fetch_from_all_sources
+from ..crawlers.rss import fetch_rss_articles
+from ..crawlers.github_trending import fetch_github_trending
+from ..crawlers.hackernews import fetch_hackernews_articles
 from ..sources.article_crawler import fetch_article_info
 from ..crawlers.sogou_wechat import search_articles_by_keyword
 from ..sources.ai_candidates import (
@@ -488,6 +492,86 @@ async def update_env_config(request: dict, admin: None = Depends(_require_admin)
             "wecom_webhook": load_env_var("WECOM_WEBHOOK"),
         }
     }
+
+
+@router.post("/test/rss")
+async def test_rss_source(request: dict, admin: None = Depends(_require_admin)):
+    """测试 RSS Feed 抓取"""
+    feed_url = request.get("feed_url", "").strip()
+    if not feed_url:
+        raise HTTPException(status_code=400, detail="请提供 RSS Feed URL")
+    
+    try:
+        articles = await fetch_rss_articles(feed_url, max_items=5)
+        return {
+            "ok": True,
+            "count": len(articles),
+            "articles": articles
+        }
+    except Exception as e:
+        logger.error(f"测试 RSS Feed 失败: {e}")
+        raise HTTPException(status_code=500, detail=f"测试失败: {str(e)}")
+
+
+@router.post("/test/github-trending")
+async def test_github_trending_source(request: dict, admin: None = Depends(_require_admin)):
+    """测试 GitHub Trending 抓取"""
+    language = request.get("language", "python").strip()
+    
+    try:
+        articles = await fetch_github_trending(language, max_items=5)
+        return {
+            "ok": True,
+            "count": len(articles),
+            "articles": articles
+        }
+    except Exception as e:
+        logger.error(f"测试 GitHub Trending 失败: {e}")
+        raise HTTPException(status_code=500, detail=f"测试失败: {str(e)}")
+
+
+@router.post("/test/hackernews")
+async def test_hackernews_source(request: dict, admin: None = Depends(_require_admin)):
+    """测试 Hacker News 抓取"""
+    min_points = request.get("min_points", 50)
+    
+    try:
+        articles = await fetch_hackernews_articles(min_points=min_points, max_items=5)
+        return {
+            "ok": True,
+            "count": len(articles),
+            "articles": articles
+        }
+    except Exception as e:
+        logger.error(f"测试 Hacker News 失败: {e}")
+        raise HTTPException(status_code=500, detail=f"测试失败: {str(e)}")
+
+
+@router.post("/test/all-sources")
+async def test_all_sources(request: dict, admin: None = Depends(_require_admin)):
+    """测试所有资讯源"""
+    keywords = request.get("keywords", [])
+    rss_feeds = request.get("rss_feeds", [])
+    github_languages = request.get("github_languages", [])
+    hackernews_min_points = request.get("hackernews_min_points", 50)
+    max_per_source = request.get("max_per_source", 3)
+    
+    try:
+        articles = await fetch_from_all_sources(
+            keywords=keywords,
+            rss_feeds=rss_feeds,
+            github_languages=github_languages,
+            hackernews_min_points=hackernews_min_points,
+            max_per_source=max_per_source,
+        )
+        return {
+            "ok": True,
+            "count": len(articles),
+            "articles": articles[:20]  # 只返回前20条
+        }
+    except Exception as e:
+        logger.error(f"测试所有资讯源失败: {e}")
+        raise HTTPException(status_code=500, detail=f"测试失败: {str(e)}")
 
 
 @router.get("/panel", response_class=HTMLResponse)
