@@ -285,6 +285,18 @@ def save_env_var(key: str, value: str) -> bool:
             logger.error(f"Failed to read .env file: {exc}")
             return False
     
+    # 转义值中的特殊字符，确保 .env 文件格式正确
+    # 转义反斜杠、引号、换行符等
+    escaped_value = (
+        value
+        .replace("\\", "\\\\")  # 先转义反斜杠
+        .replace('"', '\\"')    # 转义双引号
+        .replace("'", "\\'")    # 转义单引号
+        .replace("\n", "\\n")   # 转义换行符
+        .replace("\r", "\\r")   # 转义回车符
+        .replace("$", "\\$")    # 转义美元符号（避免变量替换）
+    )
+    
     # 更新或添加变量
     new_lines = []
     for line in lines:
@@ -296,7 +308,8 @@ def save_env_var(key: str, value: str) -> bool:
         if "=" in stripped:
             k = stripped.split("=", 1)[0].strip()
             if k == key:
-                new_lines.append(f'{key}="{value}"\n')
+                # 使用双引号包裹，确保特殊字符被正确转义
+                new_lines.append(f'{key}="{escaped_value}"\n')
                 key_found = True
                 continue
         
@@ -304,7 +317,7 @@ def save_env_var(key: str, value: str) -> bool:
     
     # 如果没找到，添加到末尾
     if not key_found:
-        new_lines.append(f'{key}="{value}"\n')
+        new_lines.append(f'{key}="{escaped_value}"\n')
     
     # 写入文件
     try:
