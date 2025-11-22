@@ -45,6 +45,11 @@ from ..sources.ai_candidates import (
     promote_candidates_to_articles,
     save_candidate_pool,
 )
+from ..sources.tool_candidates import (
+    load_candidate_pool as load_tool_candidate_pool,
+    save_candidate_pool as save_tool_candidate_pool,
+    CandidateTool,
+)
 import json
 from pathlib import Path
 
@@ -93,6 +98,11 @@ class WecomTemplateRequest(BaseModel):
 
 class CandidateActionRequest(BaseModel):
     url: str
+
+class ArchiveArticleRequest(BaseModel):
+    url: str
+    category: str  # 分类名称，如 programming, ai_coding
+    tool_tags: Optional[list[str]] = []  # 工具标签列表，可为空
 
 
 def _clear_content_pools() -> None:
@@ -217,6 +227,9 @@ async def list_candidate_articles(admin: None = Depends(_require_admin)):
     candidates = load_candidate_pool()
     logger.info(f"Endpoint /candidates: Found {len(candidates)} candidates in the pool.")
 
+    # 检查归档状态
+    from ..services.data_loader import DataLoader
+    
     grouped_candidates = {}
     for candidate in candidates:
         # crawled_from format is "sogou_wechat:KEYWORD"
@@ -228,7 +241,11 @@ async def list_candidate_articles(admin: None = Depends(_require_admin)):
 
         if keyword not in grouped_candidates:
             grouped_candidates[keyword] = []
-        grouped_candidates[keyword].append(asdict(candidate))
+        
+        # 检查是否已归档
+        candidate_dict = asdict(candidate)
+        candidate_dict["is_archived"] = DataLoader.is_article_archived(candidate.url)
+        grouped_candidates[keyword].append(candidate_dict)
 
     return {"ok": True, "grouped_candidates": grouped_candidates}
 
@@ -289,6 +306,163 @@ async def reject_candidate(request: CandidateActionRequest, admin: None = Depend
     save_candidate_pool(remaining_candidates)
     
     return {"ok": True, "message": "文章已成功从候选池中忽略。"}
+
+
+@router.post("/archive-candidate")
+async def archive_candidate(request: ArchiveArticleRequest, admin: None = Depends(_require_admin)):
+    """归档一篇文章到指定分类的JSON文件（归档后文章仍保留在候选池中）"""
+    url = request.url.strip()
+    category = request.category.strip()
+    tool_tags = request.tool_tags or []
+    
+    if not url:
+        raise HTTPException(status_code=400, detail="URL不能为空")
+    
+    if not category:
+        raise HTTPException(status_code=400, detail="分类不能为空")
+    
+    # 验证分类是否有效
+    valid_categories = ["programming", "ai_coding"]
+    if category not in valid_categories:
+        raise HTTPException(status_code=400, detail=f"无效的分类，支持的分类：{', '.join(valid_categories)}")
+    
+    candidates = load_candidate_pool()
+    
+    # 查找要归档的文章（不删除，保留在候选池中）
+    article_to_archive = None
+    for candidate in candidates:
+        if candidate.url == url:
+            # 转换为文章格式
+            article_to_archive = {
+                "title": candidate.title,
+                "url": candidate.url,
+                "source": candidate.source or "",
+                "summary": candidate.summary or "",
+                "tags": tool_tags,  # 使用工具标签
+                "tool_tags": tool_tags,  # 单独存储工具标签，方便查询
+                "score": getattr(candidate, 'score', 8.0)
+            }
+            break
+    
+    if not article_to_archive:
+        raise HTTPException(status_code=404, detail="在候选池中未找到该文章")
+    
+    # 使用DataLoader归档文章
+    from ..services.data_loader import DataLoader
+    success = DataLoader.archive_article_to_category(article_to_archive, category, tool_tags)
+    
+    if not success:
+        raise HTTPException(status_code=500, detail="归档失败，请查看服务器日志")
+    
+    # 注意：归档后不删除候选池中的文章，保留以便后续采纳
+    
+    return {"ok": True, "message": f"文章已成功归档到 {category} 分类。文章仍保留在候选池中，可继续采纳。"}
+
+
+# ========== 工具候选池相关API ==========
+
+@router.get("/tool-candidates")
+async def list_candidate_tools(admin: None = Depends(_require_admin)):
+    """获取所有待审核的工具列表"""
+    try:
+        candidates = load_tool_candidate_pool()
+        logger.info(f"Endpoint /tool-candidates: Found {len(candidates)} tool candidates in the pool.")
+        
+        return {
+            "ok": True,
+            "candidates": [asdict(c) for c in candidates]
+        }
+    except Exception as e:
+        logger.error(f"获取工具候选池失败: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"获取工具候选池失败: {str(e)}")
+
+
+@router.post("/accept-tool-candidate")
+async def accept_tool_candidate(request: dict, admin: None = Depends(_require_admin)):
+    """采纳一个工具，从候选池移动到正式工具池"""
+    url = request.get("url", "").strip()
+    category = request.get("category", "other").strip()
+    
+    if not url:
+        raise HTTPException(status_code=400, detail="URL不能为空")
+    
+    try:
+        candidates = load_tool_candidate_pool()
+        
+        tool_to_accept = None
+        remaining_candidates = []
+        for candidate in candidates:
+            if candidate.url == url:
+                tool_to_accept = candidate
+            else:
+                remaining_candidates.append(candidate)
+        
+        if not tool_to_accept:
+            raise HTTPException(status_code=404, detail="在工具候选池中未找到该工具")
+        
+        # 1. 从候选池中移除
+        save_tool_candidate_pool(remaining_candidates)
+        
+        # 2. 添加到正式工具池
+        from ..services.data_loader import DataLoader
+        from datetime import datetime
+        
+        # 生成工具ID（使用时间戳）
+        tool_id = int(datetime.now().timestamp() * 1000) % 1000000
+        
+        tool_data = {
+            "id": tool_id,
+            "name": tool_to_accept.name,
+            "url": tool_to_accept.url,
+            "description": tool_to_accept.description,
+            "category": category or tool_to_accept.category,
+            "tags": tool_to_accept.tags or [],
+            "icon": tool_to_accept.icon or "</>",
+            "score": 0,
+            "view_count": 0,
+            "like_count": 0,
+            "is_featured": False,
+            "created_at": tool_to_accept.submitted_at or datetime.now().isoformat() + "Z"
+        }
+        
+        # 保存到对应的分类文件
+        success = DataLoader.archive_tool_to_category(tool_data, category or tool_to_accept.category)
+        
+        if not success:
+            # 如果保存失败，恢复候选池
+            remaining_candidates.append(tool_to_accept)
+            save_tool_candidate_pool(remaining_candidates)
+            raise HTTPException(status_code=500, detail="保存工具失败")
+        
+        return {"ok": True, "message": f"工具已成功采纳到 {category or tool_to_accept.category} 分类。"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"采纳工具失败: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"采纳工具失败: {str(e)}")
+
+
+@router.post("/reject-tool-candidate")
+async def reject_tool_candidate(request: dict, admin: None = Depends(_require_admin)):
+    """忽略一个工具，从候选池中删除"""
+    url = request.get("url", "").strip()
+    if not url:
+        raise HTTPException(status_code=400, detail="URL不能为空")
+    
+    try:
+        candidates = load_tool_candidate_pool()
+        remaining_candidates = [c for c in candidates if c.url != url]
+        
+        if len(remaining_candidates) == len(candidates):
+            raise HTTPException(status_code=404, detail="在工具候选池中未找到该工具")
+        
+        save_tool_candidate_pool(remaining_candidates)
+        return {"ok": True, "message": "工具已从候选池中移除。"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"忽略工具失败: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"忽略工具失败: {str(e)}")
 
 
 @router.post("/crawl-articles")
@@ -1059,425 +1233,175 @@ async def digest_panel():
     <html lang="zh-CN">
     <head>
       <meta charset="UTF-8" />
-    <title>每日新闻管理面板</title>
-      <style>
-        body { font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; margin: 24px; background: #f5f5f7; color: #111827; }
-        h1 { font-size: 24px; margin-bottom: 8px; }
-        h2 { font-size: 18px; margin-top: 24px; margin-bottom: 12px; }
-        .meta { margin-bottom: 16px; color: #6b7280; }
-        button { padding: 8px 16px; border-radius: 999px; border: none; cursor: pointer; background: #2563eb; color: #fff; font-size: 14px; }
-        button:disabled { opacity: 0.5; cursor: not-allowed; }
-        .add-article-form { background: #ffffff; border-radius: 12px; padding: 16px; margin-bottom: 24px; box-shadow: 0 1px 2px rgba(0,0,0,0.04); }
-        .form-group { margin-bottom: 12px; }
-        .form-group label { display: block; margin-bottom: 4px; font-size: 13px; font-weight: 500; color: #374151; }
-        .form-group input { width: 100%; padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 14px; box-sizing: border-box; }
-        .form-group input:focus { outline: none; border-color: #2563eb; }
-        .form-actions { display: flex; gap: 8px; }
-        .btn-secondary { background: #6b7280; }
-        .btn-danger { background: #dc2626; font-size: 12px; padding: 6px 12px; }
-        .btn-danger:hover { background: #b91c1c; }
-        .articles { margin-top: 16px; }
-        .article { background: #ffffff; border-radius: 12px; padding: 12px 16px; margin-bottom: 8px; box-shadow: 0 1px 2px rgba(0,0,0,0.04); position: relative; }
-        .article-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 4px; }
-        .article-title { font-weight: 600; margin-bottom: 4px; flex: 1; }
-        .article-actions { display: flex; gap: 8px; }
-        .article-meta { font-size: 12px; color: #6b7280; margin-bottom: 4px; }
-        .article-summary { font-size: 13px; color: #374151; }
-        .status { margin-top: 12px; font-size: 13px; }
-        .status.success { color: #059669; }
-        .status.error { color: #dc2626; }
-        a { color: #2563eb; text-decoration: none; }
-        a:hover { text-decoration: underline; }
-        .top-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
-        .top-bar-links { font-size: 13px; color: #6b7280; }
-        .top-bar-links a { color: #2563eb; }
-        .btn-success { background: #16a34a; font-size: 12px; padding: 6px 12px; }
-        .btn-success:hover { background: #15803d; }
-        .auth-overlay {
-          position: fixed;
-          inset: 0;
-          background: rgba(15,23,42,0.65);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          z-index: 50;
+      <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+      <title>每日新闻管理面板</title>
+      <script src="https://cdn.tailwindcss.com"></script>
+      <script>
+        tailwind.config = {
+          corePlugins: {
+            preflight: false,
+          }
         }
-        .auth-dialog {
-          width: 320px;
-          background: #ffffff;
-          border-radius: 16px;
-          padding: 20px 18px 16px;
-          box-shadow: 0 18px 45px rgba(15,23,42,0.35);
-        }
-        .auth-dialog h2 {
-          margin: 0 0 8px;
-          font-size: 18px;
-        }
-        .auth-dialog p {
-          margin: 0 0 12px;
-          font-size: 13px;
-          color: #6b7280;
-        }
-        .auth-dialog input {
-          width: 100%;
-          padding: 8px 12px;
-          border-radius: 8px;
-          border: 1px solid #d1d5db;
-          font-size: 14px;
-          box-sizing: border-box;
-        }
-        .auth-dialog input:focus {
-          outline: none;
-          border-color: #2563eb;
-        }
-        .auth-actions {
-          margin-top: 12px;
-          display: flex;
-          justify-content: flex-end;
-          gap: 8px;
-        }
-        .config-btn {
-          border-radius: 999px;
-          padding: 6px 16px;
-          font-weight: 600;
-          background: #2563eb;
-          color: #fff;
-          border: none;
-          cursor: pointer;
-          font-size: 14px;
-        }
-        .config-modal {
-          display: none;
-          position: fixed;
-          inset: 0;
-          background: rgba(15, 23, 42, 0.45);
-          align-items: center;
-          justify-content: center;
-          z-index: 60;
-        }
-        .config-modal.is-visible {
-          display: flex;
-        }
-        .config-modal-content {
-          width: min(980px, 95vw);
-          max-height: 90vh;
-          overflow-y: auto;
-          background: #fff;
-          border-radius: 20px;
-          padding: 24px;
-          box-shadow: 0 25px 45px rgba(15, 23, 42, 0.25);
-          position: relative;
-        }
-        .config-modal-close {
-          position: absolute;
-          top: 14px;
-          right: 18px;
-          width: 32px;
-          height: 32px;
-          border-radius: 50%;
-          border: none;
-          background: #f4f5f7;
-          color: #1d4ed8;
-          font-size: 18px;
-          cursor: pointer;
-        }
-        .config-menu {
-          display: flex;
-          gap: 8px;
-          margin-bottom: 20px;
-        }
-        .config-menu-btn {
-          flex: 1;
-          padding: 8px 12px;
-          border-radius: 8px;
-          border: 1px solid #d1d5db;
-          background: #f8fafc;
-          color: #111827;
-          cursor: pointer;
-          font-size: 14px;
-        }
-        .config-menu-btn.is-active {
-          background: #2563eb;
-          color: #fff;
-          border-color: #2563eb;
-        }
-        .config-section {
-          display: none;
-        }
-        .config-section.is-active {
-          display: block;
-        }
-        .config-textarea {
-          width: 100%;
-          min-height: 150px;
-          padding: 8px 12px;
-          border-radius: 8px;
-          border: 1px solid #d1d5db;
-          font-size: 13px;
-          font-family: monospace;
-          resize: vertical;
-          box-sizing: border-box;
-        }
-        .config-note {
-          margin-top: 8px;
-          font-size: 12px;
-          color: #6b7280;
-          line-height: 1.5;
-        }
-        .form-grid {
-          display: grid;
-          grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-          gap: 12px;
-        }
-        .form-grid input {
-          padding: 8px 12px;
-          border: 1px solid #d1d5db;
-          border-radius: 6px;
-          font-size: 14px;
-          box-sizing: border-box;
-        }
-        .draft-actions {
-          display: flex;
-          gap: 10px;
-          margin-bottom: 12px;
-        }
-        .drafts-list {
-          margin-top: 16px;
-        }
-        .draft-item {
-          background: #ffffff;
-          border-radius: 12px;
-          padding: 16px;
-          margin-bottom: 12px;
-          box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-          border: 1px solid #e5e7eb;
-        }
-        .draft-header {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          margin-bottom: 12px;
-        }
-        .draft-title {
-          font-weight: 600;
-          font-size: 16px;
-          color: #111827;
-        }
-        .draft-meta {
-          font-size: 12px;
-          color: #6b7280;
-          margin-top: 4px;
-        }
-        .draft-articles {
-          margin-top: 12px;
-        }
-        .draft-article-item {
-          padding: 8px;
-          background: #f9fafb;
-          border-radius: 6px;
-          margin-bottom: 8px;
-        }
-        .draft-article-item strong {
-          color: #111827;
-        }
-        .draft-actions-btns {
-          display: flex;
-          gap: 8px;
-          margin-top: 12px;
-        }
-        .draft-modal {
-          display: none;
-          position: fixed;
-          inset: 0;
-          background: rgba(15, 23, 42, 0.45);
-          align-items: center;
-          justify-content: center;
-          z-index: 70;
-        }
-        .draft-modal.is-visible {
-          display: flex;
-        }
-        .draft-modal-content {
-          width: min(800px, 95vw);
-          max-height: 90vh;
-          overflow-y: auto;
-          background: #fff;
-          border-radius: 20px;
-          padding: 24px;
-          box-shadow: 0 25px 45px rgba(15, 23, 42, 0.25);
-          position: relative;
-        }
-        .draft-edit-form {
-          margin-top: 16px;
-        }
-        .draft-edit-form input,
-        .draft-edit-form textarea {
-          width: 100%;
-          padding: 8px 12px;
-          border: 1px solid #d1d5db;
-          border-radius: 6px;
-          font-size: 14px;
-          box-sizing: border-box;
-          margin-bottom: 12px;
-        }
-        .draft-edit-form textarea {
-          min-height: 100px;
-          font-family: inherit;
-        }
-        .html-editor-btn {
-          padding: 6px 12px;
-          border: 1px solid #d1d5db;
-          border-radius: 4px;
-          background: #fff;
-          cursor: pointer;
-          font-size: 14px;
-          font-weight: bold;
-          color: #374151;
-        }
-        .html-editor-btn:hover {
-          background: #f3f4f6;
-          border-color: #9ca3af;
-        }
-        .html-editor-btn:active {
-          background: #e5e7eb;
-        }
-        [contenteditable="true"] {
-          outline: none;
-        }
-        [contenteditable="true"]:focus {
-          border-color: #2563eb;
-          box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
-        }
-      </style>
+      </script>
     </head>
-    <body>
-      <div class="top-bar">
-        <h1>每日新闻精选 · 管理员面板</h1>
-        <div class="top-bar-links">
-          开源仓库：
-          <a href="https://github.com/yunlongwen/100kwhy_wechat_mp" target="_blank" rel="noopener noreferrer">
-            github.com/yunlongwen/100kwhy_wechat_mp
-          </a>
-        </div>
-        <button class="config-btn" id="open-config-btn">配置管理</button>
-      </div>
-      
-      <h2>添加文章</h2>
-      <div class="add-article-form">
-        <div class="form-group">
-          <label for="article-url">文章URL：</label>
-          <input type="url" id="article-url" placeholder="粘贴文章链接，例如：https://mp.weixin.qq.com/s/..." />
-        </div>
-        <div class="form-actions">
-          <button id="add-article-btn">添加文章</button>
-        </div>
-        <div class="status" id="add-status"></div>
-      </div>
-
-      <h2>文章抓取与候选池</h2>
-      <div class="add-article-form">
-        <div class="form-actions">
-          <button id="crawl-btn">开始自动抓取</button>
-        </div>
-        <div class="status" id="crawl-status"></div>
-        <div class="articles" id="candidate-list">加载中...</div>
-      </div>
-
-      <h2>文章列表</h2>
-      <div class="add-article-form">
-        <div class="status" id="list-status"></div>
-        <div class="articles" id="article-list">加载中...</div>
-      </div>
-
-      <h2>预览 & 推送</h2>
-      <div class="meta" id="meta">加载中...</div>
-      <div id="articles"></div>
-      <button id="trigger-btn">手动触发一次推送到企业微信群</button>
-      <div class="status" id="status"></div>
-
-      <!-- 微信公众号草稿箱功能已暂时屏蔽 -->
-      <!--
-      <h2>微信公众号草稿箱</h2>
-      <div class="draft-actions">
-        <button id="create-draft-btn" class="btn-success">从文章池创建草稿</button>
-        <button id="refresh-drafts-btn" class="btn-secondary">刷新草稿列表</button>
-      </div>
-      <div class="status" id="drafts-status"></div>
-      <div class="drafts-list" id="drafts-list">加载中...</div>
-      -->
-
-
-
-      <div class="auth-overlay" id="auth-overlay" style="display: none;">
-        <div class="auth-dialog">
-          <h2>输入授权码</h2>
-          <p>仅限管理员访问。请填写授权码后进入面板。</p>
-          <input type="password" id="admin-code-input" placeholder="授权码" />
-          <div class="status" id="auth-status"></div>
-          <div class="auth-actions">
-            <button class="btn" id="auth-submit-btn">确认</button>
-          </div>
-        </div>
-      </div>
-
-      <div class="config-modal" id="config-modal">
-        <div class="config-modal-content">
-          <button class="config-modal-close" id="close-config-btn">&times;</button>
-          <h2>配置管理</h2>
-          <div class="config-menu">
-            <button class="config-menu-btn is-active" data-section="keywords">关键词</button>
-            <button class="config-menu-btn" data-section="schedule">调度</button>
-            <button class="config-menu-btn" data-section="template">企业微信模板</button>
-            <button class="config-menu-btn" data-section="env">系统配置</button>
-          </div>
-
-          <div id="config-keywords-section" class="config-section is-active">
-            <div class="form-group">
-              <label for="config-keywords-input">关键词（每行一个）</label>
-              <textarea id="config-keywords-input" class="config-textarea" placeholder="例如：&#10;AI 编码&#10;数字孪生"></textarea>
-              <p class="config-note">一行一个关键词，支持中文与英文。保存后下一次抓取会自动生效。</p>
+    <body class="bg-gray-50 text-gray-900 font-sans">
+      <div class="max-w-7xl mx-auto p-6">
+        <!-- 顶部栏 -->
+        <div class="flex justify-between items-center mb-6">
+          <h1 class="text-2xl font-bold text-gray-900">每日新闻精选 · 管理员面板</h1>
+          <div class="flex items-center gap-4">
+            <div class="text-sm text-gray-600">
+              开源仓库：
+              <a href="https://github.com/yunlongwen/100kwhy_wechat_mp" target="_blank" rel="noopener noreferrer" class="text-blue-600 hover:text-blue-700">
+                github.com/yunlongwen/100kwhy_wechat_mp
+              </a>
             </div>
-            <div class="form-actions">
-              <button class="btn-success" id="save-keywords-btn">保存关键词</button>
+            <button class="px-4 py-2 bg-blue-600 text-white text-sm font-semibold rounded-full hover:bg-blue-700 transition-colors" id="open-config-btn">配置管理</button>
+          </div>
+        </div>
+        
+        <!-- 添加文章 -->
+        <div class="mb-6">
+          <h2 class="text-lg font-semibold text-gray-900 mb-4">添加文章</h2>
+          <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+            <div class="mb-4">
+              <label for="article-url" class="block text-sm font-medium text-gray-700 mb-2">文章URL：</label>
+              <input type="url" id="article-url" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="粘贴文章链接，例如：https://mp.weixin.qq.com/s/..." />
             </div>
-            <div class="status" id="config-keywords-status"></div>
+            <div class="flex gap-2">
+              <button id="add-article-btn" class="px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">添加文章</button>
+            </div>
+            <div class="mt-3 text-sm" id="add-status"></div>
+          </div>
+        </div>
+
+        <!-- 文章抓取与候选池 -->
+        <div class="mb-6">
+          <h2 class="text-lg font-semibold text-gray-900 mb-4">文章抓取与候选池</h2>
+          <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+            <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+              <h3 class="text-sm font-semibold text-blue-900 mb-2">操作说明</h3>
+              <ul class="text-xs text-blue-800 space-y-1">
+                <li><strong>采纳</strong>：将文章添加到正式文章池，用于每日推送。采纳后文章会从候选池移除。</li>
+                <li><strong>归档</strong>：将文章保存到资讯模块的JSON文件中，方便在前端页面展示。归档时可以选择关联的工具标签，设置后可在工具详情页查看相关资讯。归档后文章仍保留在候选池中，可继续采纳。</li>
+                <li><strong>忽略</strong>：从候选池中删除文章，不再显示。</li>
+              </ul>
+            </div>
+            <div class="flex gap-2 mb-4">
+              <button id="crawl-btn" class="px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">开始自动抓取</button>
+            </div>
+            <div class="text-sm mb-4" id="crawl-status"></div>
+            <div class="mt-4" id="candidate-list">加载中...</div>
+          </div>
+        </div>
+
+        <!-- 工具候选池 -->
+        <div class="mb-6">
+          <h2 class="text-lg font-semibold text-gray-900 mb-4">工具候选池</h2>
+          <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+            <div class="bg-purple-50 border border-purple-200 rounded-lg p-4 mb-4">
+              <h3 class="text-sm font-semibold text-purple-900 mb-2">操作说明</h3>
+              <ul class="text-xs text-purple-800 space-y-1">
+                <li><strong>采纳</strong>：将工具添加到正式工具池，选择分类后保存到对应的JSON文件。采纳后工具会从候选池移除。</li>
+                <li><strong>忽略</strong>：从候选池中删除工具，不再显示。</li>
+              </ul>
+            </div>
+            <div class="mt-4" id="tool-candidate-list">加载中...</div>
+          </div>
+        </div>
+
+        <!-- 文章列表 -->
+        <div class="mb-6">
+          <h2 class="text-lg font-semibold text-gray-900 mb-4">文章列表</h2>
+          <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+            <div class="text-sm mb-4" id="list-status"></div>
+            <div class="mt-4" id="article-list">加载中...</div>
+          </div>
+        </div>
+
+        <!-- 预览 & 推送 -->
+        <div class="mb-6">
+          <h2 class="text-lg font-semibold text-gray-900 mb-4">预览 & 推送</h2>
+          <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+            <div class="text-sm text-gray-600 mb-4" id="meta">加载中...</div>
+            <div id="articles" class="mb-4"></div>
+            <button id="trigger-btn" class="px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">手动触发一次推送到企业微信群</button>
+            <div class="mt-3 text-sm" id="status"></div>
+          </div>
+        </div>
+
+      <!-- 授权对话框 -->
+      <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden" id="auth-overlay">
+        <div class="bg-white rounded-2xl p-6 w-80 shadow-xl">
+          <h2 class="text-lg font-semibold text-gray-900 mb-2">输入授权码</h2>
+          <p class="text-sm text-gray-600 mb-4">仅限管理员访问。请填写授权码后进入面板。</p>
+          <input type="password" id="admin-code-input" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 mb-4" placeholder="授权码" />
+          <div class="text-sm mb-4" id="auth-status"></div>
+          <div class="flex justify-end gap-2">
+            <button class="px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-colors" id="auth-submit-btn">确认</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 配置模态框 -->
+      <div class="fixed inset-0 bg-black bg-opacity-45 flex items-center justify-center z-60 hidden" id="config-modal">
+        <div class="bg-white rounded-2xl p-6 w-full max-w-4xl max-h-[90vh] overflow-y-auto shadow-xl relative">
+          <button class="absolute top-4 right-4 w-8 h-8 rounded-full bg-gray-100 text-blue-600 hover:bg-gray-200 transition-colors flex items-center justify-center text-xl" id="close-config-btn">&times;</button>
+          <h2 class="text-xl font-semibold text-gray-900 mb-6">配置管理</h2>
+          <div class="flex gap-2 mb-6">
+            <button class="flex-1 px-3 py-2 rounded-lg border border-gray-300 bg-blue-600 text-white text-sm font-medium config-menu-btn is-active" data-section="keywords">关键词</button>
+            <button class="flex-1 px-3 py-2 rounded-lg border border-gray-300 bg-gray-50 text-gray-900 text-sm font-medium config-menu-btn" data-section="schedule">调度</button>
+            <button class="flex-1 px-3 py-2 rounded-lg border border-gray-300 bg-gray-50 text-gray-900 text-sm font-medium config-menu-btn" data-section="template">企业微信模板</button>
+            <button class="flex-1 px-3 py-2 rounded-lg border border-gray-300 bg-gray-50 text-gray-900 text-sm font-medium config-menu-btn" data-section="env">系统配置</button>
           </div>
 
-          <div id="config-schedule-section" class="config-section">
-            <div class="form-group">
-              <label>调度方式</label>
-              <div class="form-grid">
-                <input type="text" id="schedule-cron" placeholder="Cron 表达式（可选）" />
-                <input type="number" id="schedule-hour" min="0" max="23" placeholder="小时" />
-                <input type="number" id="schedule-minute" min="0" max="59" placeholder="分钟" />
+          <div id="config-keywords-section" class="config-section block">
+            <div class="mb-4">
+              <label for="config-keywords-input" class="block text-sm font-medium text-gray-700 mb-2">关键词（每行一个）</label>
+              <textarea id="config-keywords-input" class="w-full min-h-[150px] px-3 py-2 border border-gray-300 rounded-lg font-mono text-sm resize-y" placeholder="例如：&#10;AI 编码&#10;数字孪生"></textarea>
+              <p class="mt-2 text-xs text-gray-600">一行一个关键词，支持中文与英文。保存后下一次抓取会自动生效。</p>
+            </div>
+            <div class="flex gap-2">
+              <button class="px-4 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 transition-colors" id="save-keywords-btn">保存关键词</button>
+            </div>
+            <div class="mt-3 text-sm" id="config-keywords-status"></div>
+          </div>
+
+          <div id="config-schedule-section" class="config-section hidden">
+            <div class="mb-4">
+              <label class="block text-sm font-medium text-gray-700 mb-2">调度方式</label>
+              <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <input type="text" id="schedule-cron" class="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Cron 表达式（可选）" />
+                <input type="number" id="schedule-hour" min="0" max="23" class="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="小时" />
+                <input type="number" id="schedule-minute" min="0" max="59" class="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="分钟" />
               </div>
-              <p class="config-note">
+              <p class="mt-2 text-xs text-gray-600">
                 • <strong>Cron 表达式</strong>（推荐）：5 字段格式，例如 <code>0 14 * * *</code> 表示每天 14:00 执行<br />
                 • <strong>小时 + 分钟</strong>：仅在未设置 Cron 时生效，例如 14:00 表示每天下午 2 点
               </p>
             </div>
-            <div class="form-group">
-              <label>数量控制</label>
-              <div class="form-grid">
-                <input type="number" id="schedule-count" min="1" placeholder="推送篇数" />
-                <input type="number" id="schedule-max" min="1" placeholder="每关键词最大篇数" />
+            <div class="mb-4">
+              <label class="block text-sm font-medium text-gray-700 mb-2">数量控制</label>
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <input type="number" id="schedule-count" min="1" class="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="推送篇数" />
+                <input type="number" id="schedule-max" min="1" class="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="每关键词最大篇数" />
               </div>
-              <p class="config-note">
+              <p class="mt-2 text-xs text-gray-600">
                 • <strong>推送篇数</strong>：每期推送的文章总数<br />
                 • <strong>每关键词最大篇数</strong>：每个关键词最多抓取的文章数量
               </p>
             </div>
-            <div class="form-actions">
-              <button class="btn-success" id="save-schedule-btn">保存调度</button>
+            <div class="flex gap-2">
+              <button class="px-4 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 transition-colors" id="save-schedule-btn">保存调度</button>
             </div>
-            <div class="status" id="config-schedule-status"></div>
+            <div class="mt-3 text-sm" id="config-schedule-status"></div>
           </div>
 
-          <div id="config-template-section" class="config-section">
-            <div class="form-group">
-              <label for="wecom-template-input">企业微信模板（JSON 格式）</label>
-              <textarea id="wecom-template-input" class="config-textarea"></textarea>
-              <p class="config-note">
+          <div id="config-template-section" class="config-section hidden">
+            <div class="mb-4">
+              <label for="wecom-template-input" class="block text-sm font-medium text-gray-700 mb-2">企业微信模板（JSON 格式）</label>
+              <textarea id="wecom-template-input" class="w-full min-h-[150px] px-3 py-2 border border-gray-300 rounded-lg font-mono text-sm resize-y"></textarea>
+              <p class="mt-2 text-xs text-gray-600">
                 <strong>模板说明：</strong><br />
                 填写完整的 JSON 对象，支持 Markdown 格式。推送时会自动替换以下占位符：<br />
                 • <code>{date}</code> - 推送日期（如：2024-01-15）<br />
@@ -1490,27 +1414,27 @@ async def digest_panel():
                 <strong>示例结构：</strong>包含 <code>title</code>、<code>theme</code>、<code>item</code>（含 title/source/summary）、<code>footer</code> 等字段。
               </p>
             </div>
-            <div class="form-actions">
-              <button class="btn-success" id="save-template-btn">保存模板</button>
+            <div class="flex gap-2">
+              <button class="px-4 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 transition-colors" id="save-template-btn">保存模板</button>
             </div>
-            <div class="status" id="config-template-status"></div>
+            <div class="mt-3 text-sm" id="config-template-status"></div>
           </div>
 
-          <div id="config-env-section" class="config-section">
-            <div class="form-group">
-              <label for="env-admin-code">管理员验证码</label>
-              <input type="password" id="env-admin-code" class="config-textarea" style="min-height: auto; height: auto;" placeholder="用于保护管理面板的授权码" />
-              <p class="config-note">设置后访问管理面板时需要输入此验证码。留空则不设置验证码（不推荐）。</p>
+          <div id="config-env-section" class="config-section hidden">
+            <div class="mb-4">
+              <label for="env-admin-code" class="block text-sm font-medium text-gray-700 mb-2">管理员验证码</label>
+              <input type="password" id="env-admin-code" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="用于保护管理面板的授权码" />
+              <p class="mt-2 text-xs text-gray-600">设置后访问管理面板时需要输入此验证码。留空则不设置验证码（不推荐）。</p>
             </div>
-            <div class="form-group">
-              <label for="env-wecom-webhook">企业微信推送地址</label>
-              <input type="text" id="env-wecom-webhook" class="config-textarea" style="min-height: auto; height: auto;" placeholder="https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=YOUR_KEY" />
-              <p class="config-note">企业微信群机器人的 Webhook URL。在企业微信群中添加机器人后获取。</p>
+            <div class="mb-4">
+              <label for="env-wecom-webhook" class="block text-sm font-medium text-gray-700 mb-2">企业微信推送地址</label>
+              <input type="text" id="env-wecom-webhook" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=YOUR_KEY" />
+              <p class="mt-2 text-xs text-gray-600">企业微信群机器人的 Webhook URL。在企业微信群中添加机器人后获取。</p>
             </div>
-            <div class="form-actions">
-              <button class="btn-success" id="save-env-btn">保存系统配置</button>
+            <div class="flex gap-2">
+              <button class="px-4 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 transition-colors" id="save-env-btn">保存系统配置</button>
             </div>
-            <div class="status" id="config-env-status"></div>
+            <div class="mt-3 text-sm" id="config-env-status"></div>
           </div>
         </div>
       </div>
@@ -1523,7 +1447,45 @@ async def digest_panel():
         </div>
       </div>
 
+      <!-- 归档对话框 -->
+      <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden" id="archive-modal">
+        <div class="bg-white rounded-2xl p-6 w-[500px] shadow-xl max-h-[90vh] overflow-y-auto">
+          <h2 class="text-lg font-semibold text-gray-900 mb-4">选择归档模块</h2>
+          <p class="text-sm text-gray-600 mb-4">请选择要将文章归档到的资讯模块和关联的工具标签：</p>
+          
+          <div class="mb-4">
+            <label class="block text-sm font-medium text-gray-700 mb-2">资讯分类 <span class="text-red-500">*</span></label>
+            <select id="archive-category" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+              <option value="programming">编程资讯</option>
+              <option value="ai_coding">AI资讯</option>
+            </select>
+          </div>
+          
+          <div class="mb-4">
+            <label class="block text-sm font-medium text-gray-700 mb-2">工具标签 <span class="text-gray-500">(可选，多个用逗号分隔)</span></label>
+            <input type="text" id="archive-tool-tags" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="例如：warp, cursor, copilot" />
+            <p class="mt-1 text-xs text-gray-500">输入工具名称，用逗号分隔。设置后，在工具详情页可以查看相关资讯。</p>
+          </div>
+          
+          <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-4">
+            <p class="text-xs text-yellow-800">
+              <strong>提示：</strong>归档后文章会保存到对应的资讯模块JSON文件中，并在前端页面展示。文章仍会保留在候选池中，可以继续采纳用于推送。
+            </p>
+          </div>
+          
+          <div class="text-sm mb-4" id="archive-status"></div>
+          <div class="flex justify-end gap-2">
+            <button class="px-4 py-2 bg-gray-200 text-gray-700 text-sm rounded-lg hover:bg-gray-300 transition-colors" id="archive-cancel-btn">取消</button>
+            <button class="px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-colors" id="archive-confirm-btn">确认归档</button>
+          </div>
+        </div>
+      </div>
+
       <script>
+        // 最开始的日志，确保脚本执行
+        console.log('[DEBUG] ========== 管理员面板脚本开始执行 ==========');
+        console.log('[DEBUG] 当前时间:', new Date().toISOString());
+        
         const ADMIN_CODE_KEY = "aicoding_admin_code";
         let authFailCount = 0;
         let authBlockedUntil = 0; // timestamp ms
@@ -1537,19 +1499,41 @@ async def digest_panel():
         }
 
         function showAuthOverlay() {
+          console.log('[DEBUG] showAuthOverlay 开始执行');
           const overlay = document.getElementById("auth-overlay");
           const input = document.getElementById("admin-code-input");
           const statusEl = document.getElementById("auth-status");
-          overlay.style.display = "flex";
-          statusEl.textContent = "";
-          statusEl.className = "status";
-          input.value = "";
-          input.focus();
+          
+          console.log('[DEBUG] 授权对话框元素:', { overlay, input, statusEl });
+          
+          if (!overlay) {
+            console.error('[DEBUG] 授权对话框元素未找到！');
+            return;
+          }
+          
+          console.log('[DEBUG] 授权对话框当前类名:', overlay.className);
+          overlay.classList.remove("hidden");
+          overlay.classList.add("flex");
+          console.log('[DEBUG] 授权对话框更新后类名:', overlay.className);
+          
+          if (statusEl) {
+            statusEl.textContent = "";
+            statusEl.className = "text-sm";
+          }
+          if (input) {
+            input.value = "";
+            input.focus();
+          }
+          console.log('[DEBUG] 授权对话框应该已显示');
         }
 
         function hideAuthOverlay() {
+          console.log('[DEBUG] 隐藏授权对话框');
           const overlay = document.getElementById("auth-overlay");
-          overlay.style.display = "none";
+          if (overlay) {
+            overlay.classList.add("hidden");
+            overlay.classList.remove("flex");
+          }
         }
 
         function handleAuthError(contextStatusEl) {
@@ -1579,11 +1563,15 @@ async def digest_panel():
         }
 
         async function ensureAdminCode() {
+          console.log('[DEBUG] ensureAdminCode 开始执行');
           let code = getAdminCode();
+          console.log('[DEBUG] 从 localStorage 获取授权码:', code ? '已存在' : '不存在');
           if (!code) {
+            console.log('[DEBUG] 授权码不存在，显示授权对话框');
             showAuthOverlay();
             return false;
           }
+          console.log('[DEBUG] 授权码存在，继续执行');
           return true;
         }
 
@@ -1593,7 +1581,7 @@ async def digest_panel():
 
             btn.disabled = true;
             statusEl.textContent = "正在从网络抓取文章，请稍候...（可能需要几十秒）";
-            statusEl.className = "status";
+            statusEl.className = "text-sm";
 
             try {
                 const adminCode = getAdminCode();
@@ -1610,41 +1598,215 @@ async def digest_panel():
                 const data = await res.json();
                 if (data.ok) {
                     statusEl.textContent = `✅ ${data.message}`;
-                    statusEl.className = "status success";
+                    statusEl.className = "text-sm text-green-600";
                     loadCandidateList(); // Refresh the list
                     loadCandidateList(); // Refresh the list
                 } else {
                     statusEl.textContent = `❌ ${data.message || "抓取失败"}`;
-                    statusEl.className = "status error";
+                    statusEl.className = "text-sm text-red-600";
                 }
             } catch (err) {
                 console.error(err);
                 statusEl.textContent = "❌ 请求失败，请查看浏览器控制台或服务器日志。";
-                statusEl.className = "status error";
+                statusEl.className = "text-sm text-red-600";
             } finally {
                 btn.disabled = false;
             }
         }
 
+        // 加载工具候选池
+        async function loadToolCandidateList() {
+            const listEl = document.getElementById("tool-candidate-list");
+            if (!listEl) return;
+            
+            try {
+                const adminCode = getAdminCode();
+                const res = await fetch("./tool-candidates", {
+                    headers: {
+                        "X-Admin-Code": adminCode || "",
+                    },
+                });
+                
+                if (res.status === 401 || res.status === 403) {
+                    handleAuthError(listEl);
+                    return;
+                }
+                
+                const data = await res.json();
+                if (!data.ok) {
+                    listEl.innerHTML = `<p class="text-red-600">加载失败: ${data.message || "未知错误"}</p>`;
+                    return;
+                }
+                
+                const candidates = data.candidates || [];
+                
+                if (candidates.length === 0) {
+                    listEl.innerHTML = '<p class="text-gray-500">暂无待审核的工具</p>';
+                    return;
+                }
+                
+                listEl.innerHTML = "";
+                candidates.forEach((tool) => {
+                    const div = document.createElement("div");
+                    div.className = "border border-gray-200 rounded-lg p-4 mb-3";
+                    const nameEscaped = tool.name.replace(/</g, "&lt;").replace(/>/g, "&gt;");
+                    const descEscaped = (tool.description || "").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+                    const urlEscaped = tool.url.replace(/</g, "&lt;").replace(/>/g, "&gt;");
+                    
+                    div.innerHTML = `
+                        <div class="flex justify-between items-start mb-2">
+                            <div class="flex-1">
+                                <h4 class="font-semibold text-gray-900">${nameEscaped}</h4>
+                                <p class="text-sm text-gray-600 mt-1">${descEscaped}</p>
+                                <a href="${urlEscaped}" target="_blank" class="text-sm text-blue-600 hover:underline mt-1 block">${urlEscaped}</a>
+                                <div class="text-xs text-gray-500 mt-2">
+                                    分类: ${tool.category || "未分类"} | 
+                                    提交时间: ${tool.submitted_at ? new Date(tool.submitted_at).toLocaleString("zh-CN") : "未知"}
+                                </div>
+                            </div>
+                        </div>
+                        <div class="flex gap-2 mt-3">
+                            <button class="px-3 py-1 bg-green-600 text-white text-sm rounded hover:bg-green-700" data-url="${urlEscaped}" data-category="${tool.category || "other"}">采纳</button>
+                            <button class="px-3 py-1 bg-gray-600 text-white text-sm rounded hover:bg-gray-700" data-url="${urlEscaped}">忽略</button>
+                        </div>
+                    `;
+                    
+                    div.querySelector("button.bg-green-600").addEventListener("click", () => {
+                        const promptText = "请选择工具分类:\\nide, plugin, cli, codeagent, ai-test, review, devops, doc, design, ui, mcp, other";
+                        const category = prompt(promptText, tool.category || "other");
+                        if (category) {
+                            acceptToolCandidate(tool.url, category);
+                        }
+                    });
+                    div.querySelector("button.bg-gray-600").addEventListener("click", () => rejectToolCandidate(tool.url));
+                    
+                    listEl.appendChild(div);
+                });
+            } catch (err) {
+                console.error("加载工具候选池失败:", err);
+                listEl.innerHTML = `<p class="text-red-600">加载失败: ${err.message}</p>`;
+            }
+        }
+        
+        async function acceptToolCandidate(url, category) {
+            const listEl = document.getElementById("tool-candidate-list");
+            const statusMsg = document.createElement("div");
+            statusMsg.className = "text-sm text-blue-600 mb-2";
+            statusMsg.textContent = "正在采纳工具...";
+            listEl.insertBefore(statusMsg, listEl.firstChild);
+            
+            try {
+                const adminCode = getAdminCode();
+                const res = await fetch("./accept-tool-candidate", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "X-Admin-Code": adminCode || "",
+                    },
+                    body: JSON.stringify({ url: url, category: category })
+                });
+                
+                if (res.status === 401 || res.status === 403) {
+                    handleAuthError(statusMsg);
+                    return;
+                }
+                
+                const data = await res.json();
+                if (data.ok) {
+                    statusMsg.textContent = `✅ ${data.message}`;
+                    statusMsg.className = "text-sm text-green-600 mb-2";
+                    setTimeout(() => {
+                        statusMsg.remove();
+                        loadToolCandidateList();
+                    }, 2000);
+                } else {
+                    statusMsg.textContent = `❌ ${data.message || "采纳失败"}`;
+                    statusMsg.className = "text-sm text-red-600 mb-2";
+                }
+            } catch (err) {
+                console.error(err);
+                statusMsg.textContent = "❌ 请求失败，请查看浏览器控制台。";
+                statusMsg.className = "text-sm text-red-600 mb-2";
+            }
+        }
+        
+        async function rejectToolCandidate(url) {
+            const listEl = document.getElementById("tool-candidate-list");
+            const statusMsg = document.createElement("div");
+            statusMsg.className = "text-sm text-blue-600 mb-2";
+            statusMsg.textContent = "正在忽略工具...";
+            listEl.insertBefore(statusMsg, listEl.firstChild);
+            
+            try {
+                const adminCode = getAdminCode();
+                const res = await fetch("./reject-tool-candidate", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "X-Admin-Code": adminCode || "",
+                    },
+                    body: JSON.stringify({ url: url })
+                });
+                
+                if (res.status === 401 || res.status === 403) {
+                    handleAuthError(statusMsg);
+                    return;
+                }
+                
+                const data = await res.json();
+                if (data.ok) {
+                    statusMsg.textContent = `✅ ${data.message}`;
+                    statusMsg.className = "text-sm text-green-600 mb-2";
+                    setTimeout(() => {
+                        statusMsg.remove();
+                        loadToolCandidateList();
+                    }, 2000);
+                } else {
+                    statusMsg.textContent = `❌ ${data.message || "忽略失败"}`;
+                    statusMsg.className = "text-sm text-red-600 mb-2";
+                }
+            } catch (err) {
+                console.error(err);
+                statusMsg.textContent = "❌ 请求失败，请查看浏览器控制台。";
+                statusMsg.className = "text-sm text-red-600 mb-2";
+            }
+        }
+
         async function loadCandidateList() {
+            console.log('[DEBUG] loadCandidateList 开始执行');
             const listEl = document.getElementById("candidate-list");
             const statusEl = document.getElementById("crawl-status");
+            if (!listEl) {
+                console.error('[DEBUG] candidate-list 元素未找到');
+                return;
+            }
             listEl.innerHTML = "加载中...";
 
             try {
                 const adminCode = getAdminCode();
+                console.log('[DEBUG] 请求候选列表，URL: ./candidates');
                 const res = await fetch(`./candidates?_t=${Date.now()}`, {
                     headers: { "X-Admin-Code": adminCode || "" }
                 });
+                console.log('[DEBUG] 候选列表响应状态:', res.status, res.statusText);
 
                 if (res.status === 401 || res.status === 403) {
+                    console.log('[DEBUG] 授权失败，状态码:', res.status);
                     handleAuthError(statusEl);
                     return;
                 }
 
+                if (!res.ok) {
+                    console.error('[DEBUG] 请求失败，状态码:', res.status);
+                    listEl.innerHTML = `<p class="text-red-600">请求失败: HTTP ${res.status}</p>`;
+                    return;
+                }
+
                 const data = await res.json();
+                console.log('[DEBUG] 候选列表数据:', data);
                 if (!data.ok || !data.grouped_candidates || Object.keys(data.grouped_candidates).length === 0) {
-                    listEl.innerHTML = "<p>当前没有待审核的文章。</p>";
+                    console.log('[DEBUG] 没有候选文章');
+                    listEl.innerHTML = '<p class="text-gray-600">当前没有待审核的文章。</p>';
                     return;
                 }
 
@@ -1652,51 +1814,76 @@ async def digest_panel():
                 Object.keys(data.grouped_candidates).forEach(keyword => {
                     const articles = data.grouped_candidates[keyword];
                     const groupContainer = document.createElement("div");
+                    groupContainer.className = "mb-6";
                     
                     const groupTitle = document.createElement("h3");
+                    groupTitle.className = "text-base font-semibold text-gray-900 mb-3";
                     const keywordEscaped = keyword.replace(/</g, "&lt;").replace(/>/g, "&gt;");
-                    groupTitle.innerHTML = `关键词: ${keywordEscaped} <span class="article-count">(${articles.length}篇)</span>`;
+                    groupTitle.innerHTML = `关键词: ${keywordEscaped} <span class="text-gray-500">(${articles.length}篇)</span>`;
                     groupContainer.appendChild(groupTitle);
 
                     articles.forEach((item, idx) => {
                         const div = document.createElement("div");
-                        div.className = "article";
+                        div.className = "bg-white rounded-lg p-4 mb-3 border border-gray-200 shadow-sm";
                         const urlEscaped = item.url.replace(/'/g, "&#39;").replace(/"/g, "&quot;");
                         const titleEscaped = (item.title || "").replace(/</g, "&lt;").replace(/>/g, "&gt;");
                         const sourceEscaped = (item.source || "").replace(/</g, "&lt;").replace(/>/g, "&gt;");
                         const summaryEscaped = (item.summary || "").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+                        const isArchived = item.is_archived || false;
+
+                        // 构建标签区域
+                        let tagsHtml = '';
+                        if (isArchived) {
+                            tagsHtml = '<span class="px-2 py-1 bg-purple-100 text-purple-700 text-xs rounded-full font-medium">已归档</span>';
+                        }
+
+                        // 构建按钮区域
+                        let archiveButtonHtml = '';
+                        if (isArchived) {
+                            archiveButtonHtml = '<button class="px-3 py-1 bg-gray-400 text-white text-xs rounded-lg cursor-not-allowed opacity-50" disabled>已归档</button>';
+                        } else {
+                            archiveButtonHtml = `<button class="px-3 py-1 bg-blue-600 text-white text-xs rounded-lg hover:bg-blue-700 transition-colors archive-btn" data-url="${urlEscaped}">归档</button>`;
+                        }
 
                         div.innerHTML = `
-                            <div class="article-header">
-                              <div class="article-title">
-                                ${idx + 1}. <a href="${item.url}" target="_blank" rel="noopener noreferrer">${titleEscaped}</a>
+                            <div class="flex justify-between items-start mb-2">
+                              <div class="flex-1">
+                                <div class="font-semibold text-gray-900 mb-1 flex items-center gap-2">
+                                  <span>${idx + 1}.</span>
+                                  <a href="${item.url}" target="_blank" rel="noopener noreferrer" class="text-blue-600 hover:text-blue-700">${titleEscaped}</a>
+                                  ${tagsHtml}
+                                </div>
                               </div>
-                              <div class="article-actions">
-                                <button class="btn-success" data-url="${urlEscaped}">采纳</button>
-                                <button class="btn-secondary" data-url="${urlEscaped}">忽略</button>
+                              <div class="flex gap-2 ml-4">
+                                <button class="px-3 py-1 bg-green-600 text-white text-xs rounded-lg hover:bg-green-700 transition-colors" data-url="${urlEscaped}">采纳</button>
+                                ${archiveButtonHtml}
+                                <button class="px-3 py-1 bg-gray-600 text-white text-xs rounded-lg hover:bg-gray-700 transition-colors" data-url="${urlEscaped}">忽略</button>
                               </div>
                             </div>
-                            <div class="article-meta">来源：${sourceEscaped}</div>
-                            <div class="article-summary">${summaryEscaped}</div>
+                            <div class="text-xs text-gray-600 mb-1">来源：${sourceEscaped}</div>
+                            <div class="text-sm text-gray-700">${summaryEscaped}</div>
                         `;
                         
-                        div.querySelector(".btn-success").addEventListener("click", () => acceptCandidate(item.url));
-                        div.querySelector(".btn-secondary").addEventListener("click", () => rejectCandidate(item.url));
+                        div.querySelector("button.bg-green-600").addEventListener("click", () => acceptCandidate(item.url));
+                        if (!isArchived) {
+                            div.querySelector("button.archive-btn").addEventListener("click", () => showArchiveModal(item.url));
+                        }
+                        div.querySelector("button.bg-gray-600").addEventListener("click", () => rejectCandidate(item.url));
 
                         groupContainer.appendChild(div);
                     });
                     listEl.appendChild(groupContainer);
                 });
             } catch (err) {
-                console.error(err);
-                listEl.innerHTML = "<p>加载候选文章失败，请检查服务是否正常运行。</p>";
+                console.error('[DEBUG] loadCandidateList 出错:', err);
+                listEl.innerHTML = `<p class="text-red-600">加载候选文章失败: ${err.message}</p>`;
             }
         }
 
         async function acceptCandidate(url) {
             const statusEl = document.getElementById("crawl-status");
             statusEl.textContent = "正在采纳文章...";
-            statusEl.className = "status";
+            statusEl.className = "text-sm";
 
             try {
                 const adminCode = getAdminCode();
@@ -1717,25 +1904,26 @@ async def digest_panel():
                 const data = await res.json();
                 if (data.ok) {
                     statusEl.textContent = `✅ ${data.message}`;
-                    statusEl.className = "status success";
+                    statusEl.className = "text-sm text-green-600";
                     loadCandidateList();
+                    loadToolCandidateList();
                     loadArticleList();
                     loadPreview();
                 } else {
                     statusEl.textContent = `❌ ${data.message || "采纳失败"}`;
-                    statusEl.className = "status error";
+                    statusEl.className = "text-sm text-red-600";
                 }
             } catch (err) {
                 console.error(err);
                 statusEl.textContent = "❌ 请求失败，请查看浏览器控制台。";
-                statusEl.className = "status error";
+                statusEl.className = "text-sm text-red-600";
             }
         }
 
         async function rejectCandidate(url) {
             const statusEl = document.getElementById("crawl-status");
             statusEl.textContent = "正在忽略文章...";
-            statusEl.className = "status";
+            statusEl.className = "text-sm";
 
             try {
                 const adminCode = getAdminCode();
@@ -1756,74 +1944,179 @@ async def digest_panel():
                 const data = await res.json();
                 if (data.ok) {
                     statusEl.textContent = `✅ ${data.message}`;
-                    statusEl.className = "status success";
+                    statusEl.className = "text-sm text-green-600";
                     loadCandidateList();
                     loadPreview();
                 } else {
                     statusEl.textContent = `❌ ${data.message || "忽略失败"}`;
-                    statusEl.className = "status error";
+                    statusEl.className = "text-sm text-red-600";
                 }
             } catch (err) {
                 console.error(err);
                 statusEl.textContent = "❌ 请求失败，请查看浏览器控制台。";
-                statusEl.className = "status error";
+                statusEl.className = "text-sm text-red-600";
+            }
+        }
+
+        let currentArchiveUrl = null;
+
+        function showArchiveModal(url) {
+            currentArchiveUrl = url;
+            const modal = document.getElementById("archive-modal");
+            const statusEl = document.getElementById("archive-status");
+            const categorySelect = document.getElementById("archive-category");
+            const toolTagsInput = document.getElementById("archive-tool-tags");
+            
+            if (modal) {
+                modal.classList.remove("hidden");
+                modal.classList.add("flex");
+            }
+            if (statusEl) {
+                statusEl.textContent = "";
+                statusEl.className = "text-sm";
+            }
+            if (categorySelect) {
+                categorySelect.value = "programming";
+            }
+            if (toolTagsInput) {
+                toolTagsInput.value = "";
+            }
+        }
+
+        function hideArchiveModal() {
+            const modal = document.getElementById("archive-modal");
+            if (modal) {
+                modal.classList.add("hidden");
+                modal.classList.remove("flex");
+            }
+            currentArchiveUrl = null;
+        }
+
+        async function archiveCandidate(url, category, toolTags) {
+            const statusEl = document.getElementById("crawl-status");
+            const archiveStatusEl = document.getElementById("archive-status");
+            
+            archiveStatusEl.textContent = "正在归档文章...";
+            archiveStatusEl.className = "text-sm text-blue-600";
+
+            try {
+                const adminCode = getAdminCode();
+                const res = await fetch("./archive-candidate", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "X-Admin-Code": adminCode || "",
+                    },
+                    body: JSON.stringify({ 
+                        url: url, 
+                        category: category,
+                        tool_tags: toolTags || []
+                    })
+                });
+
+                if (res.status === 401 || res.status === 403) {
+                    handleAuthError(statusEl);
+                    hideArchiveModal();
+                    return;
+                }
+
+                const data = await res.json();
+                if (data.ok) {
+                    archiveStatusEl.textContent = `✅ ${data.message}`;
+                    archiveStatusEl.className = "text-sm text-green-600";
+                    statusEl.textContent = `✅ ${data.message}`;
+                    statusEl.className = "text-sm text-green-600";
+                    
+                    // 延迟关闭对话框，让用户看到成功消息
+                    setTimeout(() => {
+                        hideArchiveModal();
+                        loadCandidateList();
+                        loadPreview();
+                    }, 1500);
+                } else {
+                    archiveStatusEl.textContent = `❌ ${data.message || "归档失败"}`;
+                    archiveStatusEl.className = "text-sm text-red-600";
+                }
+            } catch (err) {
+                console.error(err);
+                archiveStatusEl.textContent = "❌ 请求失败，请查看浏览器控制台。";
+                archiveStatusEl.className = "text-sm text-red-600";
             }
         }
 
         async function loadArticleList() {
+          console.log('[DEBUG] loadArticleList 开始执行');
           const listEl = document.getElementById("article-list");
           const statusEl = document.getElementById("list-status");
-          statusEl.textContent = "";
+          if (!listEl) {
+            console.error('[DEBUG] article-list 元素未找到');
+            return;
+          }
+          if (statusEl) statusEl.textContent = "";
           listEl.innerHTML = "加载中...";
 
           try {
             const adminCode = getAdminCode();
+            console.log('[DEBUG] 请求文章列表，URL: ./articles');
             const res = await fetch("./articles", {
               headers: { "X-Admin-Code": adminCode || "" },
             });
+            console.log('[DEBUG] 文章列表响应状态:', res.status, res.statusText);
 
             if (res.status === 401 || res.status === 403) {
+              console.log('[DEBUG] 授权失败，状态码:', res.status);
               handleAuthError(statusEl);
               return;
             }
 
+            if (!res.ok) {
+              console.error('[DEBUG] 请求失败，状态码:', res.status);
+              listEl.innerHTML = `<p class="text-red-600">请求失败: HTTP ${res.status}</p>`;
+              return;
+            }
+
             const data = await res.json();
+            console.log('[DEBUG] 文章列表数据:', data);
             
-            if (!data.ok || !data.articles || data.articles.length === 0) {
-              listEl.innerHTML = "<p>当前没有已配置的文章。</p>";
+                if (!data.ok || !data.articles || data.articles.length === 0) {
+              console.log('[DEBUG] 没有已配置的文章');
+              listEl.innerHTML = '<p class="text-gray-600">当前没有已配置的文章。</p>';
               return;
             }
 
             listEl.innerHTML = "";
             data.articles.forEach((item, idx) => {
               const div = document.createElement("div");
-              div.className = "article";
+              div.className = "bg-white rounded-lg p-4 mb-3 border border-gray-200 shadow-sm";
               const urlEscaped = item.url.replace(/'/g, "&#39;").replace(/"/g, "&quot;");
               const titleEscaped = (item.title || "").replace(/</g, "&lt;").replace(/>/g, "&gt;");
               const sourceEscaped = (item.source || "").replace(/</g, "&lt;").replace(/>/g, "&gt;");
               const summaryEscaped = (item.summary || "").replace(/</g, "&lt;").replace(/>/g, "&gt;");
               div.innerHTML = `
-                <div class="article-header">
-                  <div class="article-title">
-                    ${idx + 1}. <a href="${item.url}" target="_blank" rel="noopener noreferrer">${titleEscaped}</a>
+                <div class="flex justify-between items-start mb-2">
+                  <div class="flex-1">
+                    <div class="font-semibold text-gray-900 mb-1">
+                      ${idx + 1}. <a href="${item.url}" target="_blank" rel="noopener noreferrer" class="text-blue-600 hover:text-blue-700">${titleEscaped}</a>
+                    </div>
                   </div>
-                  <div class="article-actions">
-                    <button class="btn-danger" data-url="${urlEscaped}">删除</button>
+                  <div class="ml-4">
+                    <button class="px-3 py-1 bg-red-600 text-white text-xs rounded-lg hover:bg-red-700 transition-colors" data-url="${urlEscaped}">删除</button>
                   </div>
                 </div>
-                <div class="article-meta">来源：${sourceEscaped}</div>
-                <div class="article-summary">${summaryEscaped}</div>
+                <div class="text-xs text-gray-600 mb-1">来源：${sourceEscaped}</div>
+                <div class="text-sm text-gray-700">${summaryEscaped}</div>
               `;
               // 绑定删除按钮事件
-              const deleteBtn = div.querySelector(".btn-danger");
+              const deleteBtn = div.querySelector("button.bg-red-600");
               deleteBtn.addEventListener("click", function() {
                 deleteArticle(item.url);
               });
               listEl.appendChild(div);
             });
+            console.log('[DEBUG] 文章列表加载完成，共', data.articles.length, '篇');
           } catch (err) {
-            console.error(err);
-            listEl.innerHTML = "<p>加载失败，请检查服务是否正常运行。</p>";
+            console.error('[DEBUG] loadArticleList 出错:', err);
+            listEl.innerHTML = `<p class="text-red-600">加载失败: ${err.message}</p>`;
           }
         }
 
@@ -1854,13 +2147,13 @@ async def digest_panel():
             
             if (data.ok) {
               statusEl.textContent = `✅ ${data.message}`;
-              statusEl.className = "status success";
+              statusEl.className = "text-sm text-green-600";
               // 重新加载文章列表和预览
               loadArticleList();
               loadPreview();
             } else {
               statusEl.textContent = `❌ ${data.message || "删除失败"}`;
-              statusEl.className = "status error";
+              statusEl.className = "text-sm text-red-600";
             }
           } catch (err) {
             console.error(err);
@@ -1870,11 +2163,12 @@ async def digest_panel():
         }
 
         async function loadPreview() {
+          console.log('[DEBUG] loadPreview 开始执行');
           const metaEl = document.getElementById("meta");
           const listEl = document.getElementById("articles");
           const statusEl = document.getElementById("status");
           if (!metaEl || !listEl || !statusEl) {
-            console.error("预览元素未找到");
+            console.error("[DEBUG] 预览元素未找到", { metaEl, listEl, statusEl });
             return;
           }
           statusEl.textContent = "";
@@ -1883,34 +2177,50 @@ async def digest_panel():
 
           try {
             const adminCode = getAdminCode();
+            console.log('[DEBUG] 请求预览数据，URL: ./preview');
             const res = await fetch("./preview", {
               headers: { "X-Admin-Code": adminCode || "" }
             });
+            console.log('[DEBUG] 预览响应状态:', res.status, res.statusText);
+            
             if (res.status === 401 || res.status === 403) {
+              console.log('[DEBUG] 授权失败，状态码:', res.status);
               handleAuthError(statusEl);
               return;
             }
+
+            if (!res.ok) {
+              console.error('[DEBUG] 请求失败，状态码:', res.status);
+              metaEl.textContent = `请求失败: HTTP ${res.status}`;
+              return;
+            }
+
             const data = await res.json();
+            console.log('[DEBUG] 预览数据:', data);
             metaEl.textContent = `日期：${data.date} ｜ 主题：${data.theme} ｜ 定时：${String(data.schedule.hour).padStart(2,'0')}:${String(data.schedule.minute).padStart(2,'0')} ｜ 篇数：${data.schedule.count}`;
 
             if (!data.articles || data.articles.length === 0) {
-              listEl.innerHTML = "<p>当前配置下没有可用文章，请在服务器的 data/ai_articles.json 中添加。</p>";
+              console.log('[DEBUG] 预览中没有可用文章');
+              listEl.innerHTML = '<p class="text-gray-600">当前配置下没有可用文章，请在服务器的 data/ai_articles.json 中添加。</p>';
               return;
             }
 
             data.articles.forEach((item, idx) => {
               const div = document.createElement("div");
-              div.className = "article";
+              div.className = "bg-white rounded-lg p-4 mb-3 border border-gray-200 shadow-sm";
               div.innerHTML = `
-                <div class="article-title">${idx + 1}. <a href="${item.url}" target="_blank" rel="noopener noreferrer">${item.title}</a></div>
-                <div class="article-meta">来源：${item.source}</div>
-                <div class="article-summary">${item.summary || ""}</div>
+                <div class="font-semibold text-gray-900 mb-1">
+                  ${idx + 1}. <a href="${item.url}" target="_blank" rel="noopener noreferrer" class="text-blue-600 hover:text-blue-700">${item.title}</a>
+                </div>
+                <div class="text-xs text-gray-600 mb-1">来源：${item.source}</div>
+                <div class="text-sm text-gray-700">${item.summary || ""}</div>
               `;
               listEl.appendChild(div);
             });
+            console.log('[DEBUG] 预览加载完成，共', data.articles.length, '篇');
           } catch (err) {
-            console.error(err);
-            metaEl.textContent = "加载失败，请检查服务是否正常运行。";
+            console.error('[DEBUG] loadPreview 出错:', err);
+            metaEl.textContent = `加载失败: ${err.message}`;
           }
         }
 
@@ -1959,7 +2269,7 @@ async def digest_panel():
                 }
               }
               statusEl.textContent = `❌ 服务器错误 (${res.status})：${errorText}`;
-              statusEl.className = "status error";
+              statusEl.className = "text-sm text-red-600";
               return;
             }
             
@@ -1967,14 +2277,14 @@ async def digest_panel():
             
             if (data.ok) {
               statusEl.textContent = `✅ ${data.message}：${data.article.title}`;
-              statusEl.className = "status success";
+              statusEl.className = "text-sm text-green-600";
               urlInput.value = "";
               // 添加成功后重新加载文章列表和预览
               loadArticleList();
               loadPreview();
             } else {
               statusEl.textContent = `❌ ${data.message || "添加失败"}`;
-              statusEl.className = "status error";
+              statusEl.className = "text-sm text-red-600";
             }
           } catch (err) {
             console.error(err);
@@ -2056,11 +2366,59 @@ async def digest_panel():
         });
 
         async function initializePanel() {
+          console.log('[DEBUG] initializePanel 开始执行');
           const ok = await ensureAdminCode();
-          if (!ok) return;
-          loadCandidateList();
-          loadArticleList();
-          loadPreview();
+          console.log('[DEBUG] ensureAdminCode 返回:', ok);
+          if (!ok) {
+            console.log('[DEBUG] 授权码验证失败，停止初始化');
+            return;
+          }
+          console.log('[DEBUG] 开始加载数据...');
+          try {
+            await Promise.all([
+              loadCandidateList(),
+              loadToolCandidateList(),
+              loadArticleList(),
+              loadPreview()
+            ]);
+            console.log('[DEBUG] 所有数据加载完成');
+          } catch (err) {
+            console.error('[DEBUG] 数据加载出错:', err);
+          }
+        }
+
+        // 归档对话框事件绑定
+        const archiveModal = document.getElementById("archive-modal");
+        const archiveCancelBtn = document.getElementById("archive-cancel-btn");
+        const archiveConfirmBtn = document.getElementById("archive-confirm-btn");
+        const archiveCategory = document.getElementById("archive-category");
+
+        if (archiveCancelBtn) {
+          archiveCancelBtn.addEventListener("click", hideArchiveModal);
+        }
+
+        if (archiveConfirmBtn) {
+          archiveConfirmBtn.addEventListener("click", function() {
+            if (currentArchiveUrl) {
+              const category = archiveCategory ? archiveCategory.value : "programming";
+              const toolTagsInput = document.getElementById("archive-tool-tags");
+              let toolTags = [];
+              if (toolTagsInput && toolTagsInput.value.trim()) {
+                // 解析工具标签（逗号分隔，去除空格）
+                toolTags = toolTagsInput.value.split(',').map(tag => tag.trim()).filter(tag => tag);
+              }
+              archiveCandidate(currentArchiveUrl, category, toolTags);
+            }
+          });
+        }
+
+        // 点击背景关闭对话框
+        if (archiveModal) {
+          archiveModal.addEventListener("click", function(e) {
+            if (e.target === archiveModal) {
+              hideArchiveModal();
+            }
+          });
         }
 
         // 配置弹窗基础功能
@@ -2070,14 +2428,16 @@ async def digest_panel():
 
         function openConfigModal() {
           if (configModal) {
-            configModal.classList.add("is-visible");
+            configModal.classList.remove("hidden");
+            configModal.classList.add("flex");
             switchConfigSection("keywords");
           }
         }
 
         function closeConfigModal() {
           if (configModal) {
-            configModal.classList.remove("is-visible");
+            configModal.classList.add("hidden");
+            configModal.classList.remove("flex");
           }
         }
 
@@ -2098,7 +2458,7 @@ async def digest_panel():
             if (res.status === 401 || res.status === 403) {
               if (statusEl) {
                 statusEl.textContent = "❌ 需要授权";
-                statusEl.className = "status error";
+                statusEl.className = "text-sm text-red-600";
               }
               return;
             }
@@ -2138,7 +2498,7 @@ async def digest_panel():
             if (res.status === 401 || res.status === 403) {
               if (statusEl) {
                 statusEl.textContent = "❌ 需要授权";
-                statusEl.className = "status error";
+                statusEl.className = "text-sm text-red-600";
               }
               return;
             }
@@ -2189,7 +2549,7 @@ async def digest_panel():
             if (res.status === 401 || res.status === 403) {
               if (statusEl) {
                 statusEl.textContent = "❌ 需要授权";
-                statusEl.className = "status error";
+                statusEl.className = "text-sm text-red-600";
               }
               textarea.value = defaultTemplate;
               return;
@@ -2229,7 +2589,7 @@ async def digest_panel():
             if (res.status === 401 || res.status === 403) {
               if (statusEl) {
                 statusEl.textContent = "❌ 需要授权";
-                statusEl.className = "status error";
+                statusEl.className = "text-sm text-red-600";
               }
               return;
             }
@@ -2261,14 +2621,14 @@ async def digest_panel():
           if (!adminCode && !wecomWebhook) {
             if (statusEl) {
               statusEl.textContent = "❌ 请至少填写一项配置";
-              statusEl.className = "status error";
+              statusEl.className = "text-sm text-red-600";
             }
             return;
           }
           
           if (statusEl) {
             statusEl.textContent = "保存中...";
-            statusEl.className = "status";
+            statusEl.className = "text-sm";
           }
           
           try {
@@ -2298,7 +2658,7 @@ async def digest_panel():
             if (data.ok) {
               if (statusEl) {
                 statusEl.textContent = "✅ 系统配置已保存（需要重启服务后生效）";
-                statusEl.className = "status success";
+                statusEl.className = "text-sm text-green-600";
               }
               // 如果更新了管理员验证码，更新本地存储
               if (adminCode) {
@@ -2311,7 +2671,7 @@ async def digest_panel():
             console.error("保存系统配置失败:", err);
             if (statusEl) {
               statusEl.textContent = "❌ 保存失败: " + err.message;
-              statusEl.className = "status error";
+              statusEl.className = "text-sm text-red-600";
             }
           }
         }
@@ -2325,16 +2685,22 @@ async def digest_panel():
             const btn = document.querySelector('[data-section="' + name + '"]');
             if (sectionEl) {
               if (name === sectionName) {
-                sectionEl.classList.add("is-active");
+                sectionEl.classList.remove("hidden");
+                sectionEl.classList.add("block");
               } else {
-                sectionEl.classList.remove("is-active");
+                sectionEl.classList.add("hidden");
+                sectionEl.classList.remove("block");
               }
             }
             if (btn) {
               if (name === sectionName) {
                 btn.classList.add("is-active");
+                btn.classList.remove("bg-gray-50", "text-gray-900");
+                btn.classList.add("bg-blue-600", "text-white");
               } else {
                 btn.classList.remove("is-active");
+                btn.classList.remove("bg-blue-600", "text-white");
+                btn.classList.add("bg-gray-50", "text-gray-900");
               }
             }
           });
@@ -2378,14 +2744,14 @@ async def digest_panel():
           if (keywords.length === 0) {
             if (statusEl) {
               statusEl.textContent = "❌ 关键词不能为空";
-              statusEl.className = "status error";
+              statusEl.className = "text-sm text-red-600";
             }
             return;
           }
           
           if (statusEl) {
             statusEl.textContent = "保存中...";
-            statusEl.className = "status";
+            statusEl.className = "text-sm";
           }
           
           try {
@@ -2412,7 +2778,7 @@ async def digest_panel():
             if (data.ok) {
               if (statusEl) {
                 statusEl.textContent = "✅ 关键词已保存";
-                statusEl.className = "status success";
+                statusEl.className = "text-sm text-green-600";
               }
             } else {
               throw new Error(data.message || "保存失败");
@@ -2421,7 +2787,7 @@ async def digest_panel():
             console.error("保存关键词失败:", err);
             if (statusEl) {
               statusEl.textContent = "❌ 保存失败: " + err.message;
-              statusEl.className = "status error";
+              statusEl.className = "text-sm text-red-600";
             }
           }
         }
@@ -2454,14 +2820,14 @@ async def digest_panel():
           if (Object.keys(payload).length === 0) {
             if (statusEl) {
               statusEl.textContent = "❌ 请至少填写一项配置";
-              statusEl.className = "status error";
+              statusEl.className = "text-sm text-red-600";
             }
             return;
           }
           
           if (statusEl) {
             statusEl.textContent = "保存中...";
-            statusEl.className = "status";
+            statusEl.className = "text-sm";
           }
           
           try {
@@ -2488,7 +2854,7 @@ async def digest_panel():
             if (data.ok) {
               if (statusEl) {
                 statusEl.textContent = "✅ 调度配置已保存";
-                statusEl.className = "status success";
+                statusEl.className = "text-sm text-green-600";
               }
             } else {
               throw new Error(data.message || "保存失败");
@@ -2497,7 +2863,7 @@ async def digest_panel():
             console.error("保存调度配置失败:", err);
             if (statusEl) {
               statusEl.textContent = "❌ 保存失败: " + err.message;
-              statusEl.className = "status error";
+              statusEl.className = "text-sm text-red-600";
             }
           }
         }
@@ -2513,14 +2879,14 @@ async def digest_panel():
           } catch (err) {
             if (statusEl) {
               statusEl.textContent = "❌ JSON 格式错误: " + err.message;
-              statusEl.className = "status error";
+              statusEl.className = "text-sm text-red-600";
             }
             return;
           }
           
           if (statusEl) {
             statusEl.textContent = "保存中...";
-            statusEl.className = "status";
+            statusEl.className = "text-sm";
           }
           
           try {
@@ -2547,7 +2913,7 @@ async def digest_panel():
             if (data.ok) {
               if (statusEl) {
                 statusEl.textContent = "✅ 企业微信模板已保存";
-                statusEl.className = "status success";
+                statusEl.className = "text-sm text-green-600";
               }
             } else {
               throw new Error(data.message || "保存失败");
@@ -2556,7 +2922,7 @@ async def digest_panel():
             console.error("保存模板失败:", err);
             if (statusEl) {
               statusEl.textContent = "❌ 保存失败: " + err.message;
-              statusEl.className = "status error";
+              statusEl.className = "text-sm text-red-600";
             }
           }
         }
@@ -2576,6 +2942,7 @@ async def digest_panel():
         document.getElementById("save-env-btn").addEventListener("click", saveEnvConfig);
 
         // ========== 微信公众号草稿箱功能已暂时屏蔽 ==========
+        // 以下函数暂时屏蔽，但保留代码以便后续启用
         /*
         async function loadDraftsList() {
           const listEl = document.getElementById("drafts-list");
@@ -2667,7 +3034,7 @@ async def digest_panel():
           if (!articlesData.ok || !articlesData.articles || articlesData.articles.length === 0) {
             if (statusEl) {
               statusEl.textContent = "❌ 文章池为空，请先添加文章";
-              statusEl.className = "status error";
+              statusEl.className = "text-sm text-red-600";
             }
             return;
           }
@@ -2677,7 +3044,7 @@ async def digest_panel():
           
           if (statusEl) {
             statusEl.textContent = "正在创建草稿...";
-            statusEl.className = "status";
+            statusEl.className = "text-sm";
           }
           
           try {
@@ -2704,7 +3071,7 @@ async def digest_panel():
             if (data.ok) {
               if (statusEl) {
                 statusEl.textContent = "✅ " + data.message;
-                statusEl.className = "status success";
+                statusEl.className = "text-sm text-green-600";
               }
               loadDraftsList();
             } else {
@@ -2714,7 +3081,7 @@ async def digest_panel():
             console.error("创建草稿失败:", err);
             if (statusEl) {
               statusEl.textContent = "❌ 创建失败: " + err.message;
-              statusEl.className = "status error";
+              statusEl.className = "text-sm text-red-600";
             }
           }
         }
@@ -2946,7 +3313,7 @@ async def digest_panel():
           const statusEl = document.getElementById("drafts-status");
           if (statusEl) {
             statusEl.textContent = "正在发布...";
-            statusEl.className = "status";
+            statusEl.className = "text-sm";
           }
           
           try {
@@ -2973,7 +3340,7 @@ async def digest_panel():
             if (data.ok) {
               if (statusEl) {
                 statusEl.textContent = "✅ 发布成功！";
-                statusEl.className = "status success";
+                statusEl.className = "text-sm text-green-600";
               }
               loadDraftsList();
             } else {
@@ -2983,7 +3350,7 @@ async def digest_panel():
             console.error("发布草稿失败:", err);
             if (statusEl) {
               statusEl.textContent = "❌ 发布失败: " + err.message;
-              statusEl.className = "status error";
+              statusEl.className = "text-sm text-red-600";
             }
           }
         }
@@ -3058,12 +3425,28 @@ async def digest_panel():
           });
         }
 
-        // 初始加载：检查是否已有授权码，没有则弹出对话框
-        initializePanel();
-        
         // 加载草稿列表（已屏蔽）
         // loadDraftsList();
         */
+        
+        // 初始加载：检查是否已有授权码，没有则弹出对话框
+        console.log('[DEBUG] 脚本开始执行');
+        
+        // 确保 DOM 加载完成后再执行
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', function() {
+            // 初始化加载所有数据
+            loadCandidateList();
+            loadToolCandidateList();
+            loadArticleList();
+            loadPreview();
+            console.log('[DEBUG] DOM 加载完成，开始初始化面板');
+            initializePanel();
+          });
+        } else {
+          console.log('[DEBUG] DOM 已就绪，立即初始化面板');
+          initializePanel();
+        }
       </script>
     </body>
     </html>

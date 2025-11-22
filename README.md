@@ -1,63 +1,103 @@
-﻿## Daily Digest · 把热度新闻“秒变”你的内容资产
+﻿## AI-CodeNexus · 编程资讯与工具聚合平台
 
-`100kwhy_wechat_mp` 是一个聚焦热闻捕捉与分发的项目。只要配置好关键词和企业微信群机器人，它就能帮你：
+`100kwhy_wechat_mp` 是一个**编程资讯与工具聚合平台**，致力于为开发者提供最新、最优质的技术资讯和开发工具。
 
- - **自动发现热点**：Playwright 驱动关键词抓取，过滤掉旧闻，只保留当天新内容；
- - **一眼看完候选池**：抓到的文章会按关键词分组，方便人工筛选、快速采纳；
- - **定点推送 + 自动补位**：APScheduler 定时任务在推送前自动抽样文章，如遇空池会临时从候选池补齐；
- - **推送即清空**：手动/自动推送成功后，文章池与候选池自动清空，下一轮继续抓取，实现“无人值守”。
+### 🌐 在线访问
 
-> 目标：把“找内容 → 组日报 → 推送”整个链路自动化，让运营同学专注观点与读者，而不是到处找素材。
+**🎯 立即体验**：[https://aicoding.100kwhy.fun/](https://aicoding.100kwhy.fun/)
+
+访问我们的在线平台，浏览最新技术资讯、发现优质开发工具！
+
+### 📱 关注微信公众号
+
+<div align="center">
+  <img src="app/static/wechat_mp_qr.jpg" alt="微信公众号二维码" width="200" />
+  <br/>
+  <p>扫描二维码关注公众号，获取最新技术资讯和工具推荐</p>
+</div>
 
 ---
 
-### 亮点能力
+### 核心功能
 
-| 能力 | 描述 |
+- **📰 资讯聚合**：整合编程资讯和AI资讯，提供统一的内容浏览体验
+- **🛠️ 工具发现**：帮助开发者发现和分享优秀的开发工具
+- **🔥 智能推荐**：基于点击量和热度的智能排序和推荐
+- **👥 用户参与**：支持用户提交优质文章和工具
+- **🔐 内容管理**：完善的管理员审核和管理系统
+- **📊 数据统计**：实时访问量统计和热度排序
+
+> **定位**：我们是一个**分发基地**，不存储文章和工具的完整内容，只提供链接和元数据，帮助开发者快速发现优质资源。
+
+---
+
+### 核心特性
+
+| 特性 | 描述 |
 | --- | --- |
-| 多资讯源支持 | 支持搜狗微信、RSS/Atom Feed、GitHub Trending、Hacker News 等多种资讯源 |
-| 智能排序 | 基于热度分自动排序，综合考虑来源、时效性、标题质量等因素 |
-| 关键词抓取 | 每个关键词可配置最多抓取多少篇文章，自动计算翻页并限量存储 |
-| 候选池分组 | 面板中按关键词展示候选文章，可随时采纳/忽略 |
-| 自动补位推送 | 推送前若文章池为空，会按关键词随机抽取候选文章填充主池 |
-| 推送即清空 | 推送成功后自动清空文章池 & 候选池，防止旧内容重复推送 |
-| 管理面板 | `/digest/panel` 集成添加文章、候选池分组、预览日报、手动推送等操作 |
-| 可视化配置 | 支持在管理面板中配置关键词、调度策略、企业微信模板、系统环境变量等 |
-| 微信公众号 | 支持一键同步到微信公众号（创建草稿、发布图文）⚠️ 需配置 AppID/Secret |
-| SQLite 持久化 | 使用 SQLite 数据库存储，提升性能和稳定性 |
+| **资讯浏览** | 编程资讯、AI资讯、热门资讯、最新资讯，支持搜索和分页 |
+| **工具发现** | 热门工具、工具分类浏览，支持搜索和点击统计 |
+| **用户提交** | 支持用户提交优质文章和工具，等待管理员审核 |
+| **智能排序** | 基于访问量的热度排序，实时更新 |
+| **文章-工具关联** | 归档文章时可添加工具标签，点击工具时显示相关文章 |
+| **管理员审核** | 完善的审核系统，支持采纳、归档、忽略操作 |
+| **现代化UI** | 科技感主题，玻璃态效果，流畅动画 |
+| **标准路由** | 使用History API，无 `#` 符号的标准URL路由 |
+| **分页加载** | 所有列表支持分页，防止数据量过大导致卡顿 |
+| **点击统计** | 实时记录文章和工具的访问量，用于热度排序 |
 
 ---
 
-### 技术栈一览
+### 技术栈
 
+**后端**：
 - Python 3.10+
 - FastAPI + Uvicorn
-- Playwright（搜狗微信或其他网页）
-- APScheduler（cron 定时任务）
-- 企业微信机器人 Markdown 推送
-- SQLAlchemy + SQLite（数据持久化）
-- RSS/Atom Feed 解析
-- GitHub Trending & Hacker News API
+- JSON文件存储（`data/` 目录）
+- loguru（日志）
+
+**前端**：
+- 原生JavaScript（SPA架构）
+- Tailwind CSS + 自定义CSS
+- History API（路由）
+- Google Fonts（Orbitron、Rajdhani）
+
+**数据服务**：
+- `DataLoader` - 统一的数据加载和保存服务
+- 支持分页、筛选、搜索、排序
+- 支持点击统计和文章-工具关联
 
 ---
 
-### 目录速览
+### 目录结构
 
 ```text
 app/
-  main.py                # 应用入口 + 定时任务
-  routes/digest.py       # API & 管理面板
-  sources/               # 文章池 / 候选池工具 & 爬虫
-  notifier/wecom.py      # 企业微信推送
+  main.py                # 应用入口 + 前端HTML
+  routes/
+    api.py              # 公开API接口
+    digest.py           # 管理员面板和API
+  services/
+    data_loader.py      # 数据加载和保存服务
+  sources/              # 文章池 / 候选池工具 & 爬虫
+  notifier/             # 推送服务
 config/
-  digest_schedule.json   # 推送策略
-  wecom_template.json    # 企业微信推送样式
+  crawler_keywords.json # 抓取关键词
 data/
-  ai_articles.json       # 正式文章池（运行期数据）
-  ai_candidates.json     # 候选池（运行期数据）
-requirements.txt         # 依赖清单
+  config.json           # 页面和分类配置
+  articles/             # 正式文章池
+    programming.json   # 编程资讯
+    ai.json            # AI资讯
+  tools/                # 正式工具池
+    featured.json      # 热门工具
+    {category}.json   # 各分类工具
+  ai_candidates.json    # 文章候选池
+  tool_candidates.json  # 工具候选池
 docs/
-  deploy_python.md       # Python 环境一键部署
+  features_complete.md  # 完整功能文档 ⭐
+  feature_plan.md       # 功能开发计划
+  deploy_python.md     # Python环境部署
+requirements.txt        # 依赖清单
 ```
 
 ---
@@ -76,85 +116,146 @@ pip install -r requirements.txt
 playwright install  # 首次安装需要下载浏览器内核
 ```
 
-创建 `.env`（或直接以环境变量形式注入）：
+创建 `.env` 文件：
 
 ```bash
-cat > .env <<'EOF'
+# 管理员授权码（用于显示管理员入口）
+AICODING_ADMIN_CODE="your-admin-code-here"
+
+# 企业微信推送（可选）
 WECOM_WEBHOOK="https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=YOUR_KEY"
-# 可选：管理面板授权码
-# AICODING_ADMIN_CODE="your-admin-code"
-EOF
 ```
 
-设置推送策略 `config/digest_schedule.json`：
-
-```json
-{
-  "cron": "0 14 * * *",
-  "count": 5,
-  "max_articles_per_keyword": 3
-}
-```
-
-启动：
+安装依赖并启动：
 
 ```bash
+pip install -r requirements.txt
 uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
-- 首页：`http://localhost:8000/`
-- 管理面板：`http://localhost:8000/digest/panel`
+访问地址：
+- **在线平台**：**[https://aicoding.100kwhy.fun/](https://aicoding.100kwhy.fun/)** ⭐
+- **本地开发**：`http://localhost:8000/`
+- **管理面板**：`http://localhost:8000/digest/panel`（需要授权码）
+- **API文档**：`http://localhost:8000/docs`
 
-> 生产环境部署？请参考 [docs/deploy_python.md](docs/deploy_python.md) 的 Python 环境一键部署指南，桌面/本地调试可参照 [docs/deploy_windows.md](docs/deploy_windows.md)。
+> 🌐 **在线体验**：访问 [https://aicoding.100kwhy.fun/](https://aicoding.100kwhy.fun/) 立即使用我们的平台  
+> 📖 **详细文档**：请查看 [完整功能文档](docs/features_complete.md)  
+> 🚀 **部署指南**：请参考 [Python环境部署](docs/deploy_python.md) 或 [Windows部署](docs/deploy_windows.md)
 
-### 配置管理
+### 快速开始
 
-所有配置都可以在管理面板的"配置管理"中完成，无需手动编辑配置文件：
+#### 🌐 在线使用（推荐）
 
-- **关键词配置**：设置抓取关键词，每行一个
-- **调度配置**：设置推送时间（支持 Cron 表达式或小时+分钟）和数量控制
-- **企业微信模板**：自定义推送消息的 Markdown 格式，支持占位符 `{date}`、`{theme}`、`{idx}`、`{title}`、`{url}`、`{source}`、`{summary}`
-- **系统配置**：配置管理员验证码和企业微信推送地址
+直接访问 **[https://aicoding.100kwhy.fun/](https://aicoding.100kwhy.fun/)** 开始使用，无需安装！
 
-> 提示：配置修改后会自动保存，系统配置（环境变量）需要重启服务后生效。
+#### 💻 本地开发
 
-### 多资讯源支持
+1. **浏览资讯**：
+   - 访问 `/news` 查看编程资讯
+   - 访问 `/ai-news` 查看AI资讯
+   - 访问 `/hot-news` 查看热门资讯（按访问量排序）
+   - 访问 `/recent` 查看最新资讯（支持搜索）
 
-系统支持从多个资讯源自动抓取文章，包括：
+2. **发现工具**：
+   - 访问 `/tools` 查看热门工具（按访问量排序）
+   - 访问 `/category/{category}` 查看分类工具
+   - 点击工具查看详情和相关文章
 
-- **搜狗微信搜索**：通过关键词搜索微信公众号文章（原有功能）
-- **RSS/Atom Feed**：抓取 RSS 订阅源的文章
-- **GitHub Trending**：抓取 GitHub 热门项目
-- **Hacker News**：抓取高分技术文章
+3. **提交内容**：
+   - 访问 `/submit` 提交优质文章
+   - 访问 `/submit-tool` 提交开发工具
+   - 提交后等待管理员审核
 
-所有抓取的文章会**自动计算热度分并排序**，优先展示高质量内容。
+4. **管理员审核**：
+   - 在网页上"盲敲"授权码显示管理员入口
+   - 访问管理面板审核用户提交的内容
+   - 对文章进行采纳、归档（可添加工具标签）、忽略操作
+   - 对工具进行采纳（选择分类）、忽略操作
 
-📖 **详细使用指南**：请参考 [多资讯源使用指南](docs/multi_sources_guide.md)  
-🧪 **测试方法**：请参考 [测试指南](docs/test_sources.md)
+---
 
-### 微信公众号发布
+## 功能特性
 
-系统支持将抓取的文章自动发布到微信公众号：
+### 资讯模块
+- ✅ 编程资讯、AI资讯分类浏览
+- ✅ 热门资讯（按访问量排序）
+- ✅ 最新资讯（合并分类，支持搜索）
+- ✅ 用户提交文章功能
+- ✅ 点击统计和热度排序
 
-- **创建草稿**：将文章创建为微信公众号草稿
-- **发布草稿**：将草稿发布到公众号
-- **一键发布日报**：直接将当前日报发布到公众号
+### 工具模块
+- ✅ 热门工具（按访问量排序）
+- ✅ 11个工具分类（按研发流程排序）
+- ✅ 工具详情和相关文章
+- ✅ 用户提交工具功能
+- ✅ 点击统计和热度排序
 
-⚠️ **需要配置**：在 `.env` 文件中配置 `WECHAT_MP_APPID` 和 `WECHAT_MP_SECRET`
+### 管理员功能
+- ✅ 隐藏式管理员入口（盲敲授权码）
+- ✅ 文章候选池管理（采纳、归档、忽略）
+- ✅ 工具候选池管理（采纳、忽略）
+- ✅ 文章-工具关联（归档时添加工具标签）
+- ✅ 归档状态显示（已归档标签）
 
-📖 **详细使用指南**：请参考 [微信公众号发布指南](docs/wechat_mp_guide.md)  
-🧪 **测试方法**：运行 `python scripts/test_wechat_mp.py`
+### 技术特性
+- ✅ 标准URL路由（无 `#` 符号）
+- ✅ 分页加载（防止卡顿）
+- ✅ 搜索功能（最新资讯）
+- ✅ 动态配置（页面标题/描述）
+- ✅ 响应式设计（移动端适配）
 
 ---
 
 ## 使用场景
 
-1. **自动抓取热点**：定时任务根据关键词抓取最新文章，候选池自动按关键词分组。
-2. **人工质检**：在面板上按分组浏览，决定采纳或忽略；也可手动粘贴 URL 增补精品内容。
-3. **定时推送**：APScheduler 在设定时间构建日报 → 调用企业微信机器人，一次搞定。
-4. **循环往复**：推送成功后自动清空两个池子，下一轮继续抓取，实现“日更模式”。
+1. **开发者日常浏览**：快速浏览最新技术资讯和热门工具
+2. **内容发现**：通过热门排序发现最受欢迎的内容
+3. **工具推荐**：发现和分享优秀的开发工具
+4. **内容贡献**：提交优质文章和工具，帮助社区成长
+5. **内容管理**：管理员审核和分类管理用户提交的内容
 
-> 转载第三方内容请遵守对应平台协议，保持原文链接和署名。
+---
+
+## 📚 文档
+
+- **[完整功能文档](docs/features_complete.md)** ⭐ - 详细的功能说明和使用指南
+- [功能开发计划](docs/feature_plan.md) - 功能规划文档
+- [多资讯源使用指南](docs/multi_sources_guide.md) - 多资讯源配置
+- [测试指南](docs/test_sources.md) - 测试方法
+- [微信公众号发布指南](docs/wechat_mp_guide.md) - 公众号发布配置
+- [Python环境部署](docs/deploy_python.md) - 生产环境部署
+- [Windows部署](docs/deploy_windows.md) - Windows本地部署
+
+---
+
+## 🔄 更新日志
+
+### v2.0（当前版本）
+- ✅ 完整的资讯和工具聚合平台
+- ✅ 用户提交功能
+- ✅ 管理员审核功能
+- ✅ 点击统计和热度排序
+- ✅ 文章-工具关联
+- ✅ 现代化UI设计
+- ✅ 标准URL路由（无 `#`）
+
+### v1.0
+- ✅ 基础的文章抓取和管理系统
+- ✅ 多资讯源支持
+- ✅ 微信公众号发布
+
+---
+
+## 🤝 贡献
+
+欢迎提交 Issue 和 Pull Request！
+
+---
+
+## 📄 许可证
+
+MIT License
 
 ---
 

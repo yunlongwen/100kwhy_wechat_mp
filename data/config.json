@@ -1,0 +1,111 @@
+{
+  "pages": {
+    "tools": {
+      "id": "page-tools",
+      "title": "热门工具",
+      "description": "发现最优秀的开发工具和资源"
+    },
+    "news": {
+      "id": "page-news",
+      "title": "编程资讯",
+      "description": "最新技术文章和资讯"
+    },
+    "ai-news": {
+      "id": "page-ai-news",
+      "title": "AI资讯",
+      "description": "AI领域最新动态和技术文章"
+    },
+    "hot-news": {
+      "id": "page-hot-news",
+      "title": "热门资讯",
+      "description": "最受欢迎的技术文章"
+    },
+    "recent": {
+      "id": "page-recent",
+      "title": "最新资讯",
+      "description": "编程资讯和AI资讯的最新文章，按时间排序"
+    },
+    "submit": {
+      "id": "page-submit",
+      "title": "提交资讯",
+      "description": "分享优质的技术文章和资讯"
+    },
+    "wechat-mp": {
+      "id": "page-wechat-mp",
+      "title": "微信公众号",
+      "description": "关注我们的微信公众号，获取最新技术资讯"
+    }
+  },
+  "categories": {
+    "tools": {
+      "ide": {
+        "id": "cat-tools-ide",
+        "name": "开发IDE",
+        "description": "集成开发环境"
+      },
+      "plugin": {
+        "id": "cat-tools-plugin",
+        "name": "IDE插件",
+        "description": "编辑器插件和扩展"
+      },
+      "cli": {
+        "id": "cat-tools-cli",
+        "name": "命令行工具",
+        "description": "终端和命令行工具"
+      },
+      "codeagent": {
+        "id": "cat-tools-codeagent",
+        "name": "CodeAgent",
+        "description": "AI代码助手和代理"
+      },
+      "ai-test": {
+        "id": "cat-tools-ai-test",
+        "name": "AI测试",
+        "description": "AI驱动的测试工具"
+      },
+      "review": {
+        "id": "cat-tools-review",
+        "name": "代码审查",
+        "description": "代码审查和质量检查工具"
+      },
+      "devops": {
+        "id": "cat-tools-devops",
+        "name": "DevOps 工具",
+        "description": "开发和运维工具"
+      },
+      "doc": {
+        "id": "cat-tools-doc",
+        "name": "文档相关",
+        "description": "文档编写和管理工具"
+      },
+      "design": {
+        "id": "cat-tools-design",
+        "name": "设计工具",
+        "description": "UI/UX设计工具"
+      },
+      "ui": {
+        "id": "cat-tools-ui",
+        "name": "UI生成",
+        "description": "AI驱动的UI生成工具"
+      },
+      "mcp": {
+        "id": "cat-tools-mcp",
+        "name": "MCP工具",
+        "description": "Model Context Protocol工具"
+      }
+    },
+    "articles": {
+      "programming": {
+        "id": "cat-articles-programming",
+        "name": "编程资讯",
+        "description": "编程和技术相关文章"
+      },
+      "ai_coding": {
+        "id": "cat-articles-ai-coding",
+        "name": "AI资讯",
+        "description": "AI和机器学习相关文章"
+      }
+    }
+  }
+}
+

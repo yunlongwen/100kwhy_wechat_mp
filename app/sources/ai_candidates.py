@@ -49,13 +49,28 @@ def load_candidate_pool() -> List[CandidateArticle]:
 def save_candidate_pool(candidates: List[CandidateArticle]) -> bool:
     """将候选文章列表完整写入配置文件（覆盖）"""
     path = _candidate_data_path()
-    path.parent.mkdir(parents=True, exist_ok=True)
+    logger.info(f"保存候选池到: {path}, 文章数量: {len(candidates)}")
+    
     try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        
+        # 转换为字典列表
+        candidates_dict = [asdict(c) for c in candidates]
+        logger.debug(f"转换后的候选文章数据: {candidates_dict[:2] if len(candidates_dict) > 0 else '[]'}")  # 只记录前2条
+        
         with path.open("w", encoding="utf-8") as f:
-            json.dump([asdict(c) for c in candidates], f, ensure_ascii=False, indent=2)
-        return True
+            json.dump(candidates_dict, f, ensure_ascii=False, indent=2)
+        
+        # 验证文件是否成功写入
+        if path.exists():
+            file_size = path.stat().st_size
+            logger.info(f"候选池文件已保存，大小: {file_size} 字节")
+            return True
+        else:
+            logger.error(f"候选池文件保存后不存在: {path}")
+            return False
     except Exception as e:
-        logger.error(f"Failed to save candidate pool: {e}")
+        logger.error(f"保存候选池失败: {e}", exc_info=True)
         return False
 
 
