@@ -5,15 +5,24 @@ from typing import Dict, Any, Optional
 import httpx
 from loguru import logger
 
+from ..config_loader import load_env_var
+
 
 class WeChatMPClient:
     """微信公众号客户端"""
     
     def __init__(self):
-        self.appid = os.getenv("WECHAT_MP_APPID")
-        self.secret = os.getenv("WECHAT_MP_SECRET")
+        # 优先从 .env 文件读取，如果不存在则从环境变量读取
+        self.appid = load_env_var("WECHAT_MP_APPID") or os.getenv("WECHAT_MP_APPID")
+        self.secret = load_env_var("WECHAT_MP_SECRET") or os.getenv("WECHAT_MP_SECRET")
         self.access_token: Optional[str] = None
         self.token_expires_at: Optional[float] = None
+        
+        # 如果配置了，记录日志（不记录敏感信息）
+        if self.appid and self.secret:
+            logger.info("微信公众号配置已加载")
+        else:
+            logger.warning("微信公众号 AppID 或 Secret 未配置，相关功能将不可用")
     
     async def get_access_token(self) -> Optional[str]:
         """获取 access_token"""
