@@ -11,7 +11,7 @@
     "created_at": "2025-11-23T01:15:58.701757Z",
     "published_time": "2025-11-23T01:15:58.701757Z",
     "archived_at": "2025-11-23T01:15:58.701757Z",
-    "view_count": 0,
+    "view_count": 2,
     "category": "programming",
     "tags": [
       "Cursor"
@@ -29,7 +29,7 @@
     "created_at": "2025-11-23T01:16:15.480879Z",
     "published_time": "2025-11-23T01:16:15.480879Z",
     "archived_at": "2025-11-23T01:16:15.480879Z",
-    "view_count": 0,
+    "view_count": 3,
     "category": "programming",
     "tags": [
       "codewiki"
@@ -47,7 +47,7 @@
     "created_at": "2025-11-23T01:16:29.960192Z",
     "published_time": "2025-11-23T01:16:29.960192Z",
     "archived_at": "2025-11-23T01:16:29.960192Z",
-    "view_count": 1,
+    "view_count": 6,
     "category": "programming",
     "tags": [
       "mcpcn"
@@ -65,7 +65,7 @@
     "created_at": "2025-11-23T01:16:33.813858Z",
     "published_time": "2025-11-23T01:16:33.813858Z",
     "archived_at": "2025-11-23T01:16:33.813858Z",
-    "view_count": 0,
+    "view_count": 5,
     "category": "programming",
     "tags": [
       "coderabbit"
@@ -83,10 +83,67 @@
     "created_at": "2025-11-23T01:16:44.125674Z",
     "published_time": "2025-11-23T01:16:44.125674Z",
     "archived_at": "2025-11-23T01:16:44.125674Z",
-    "view_count": 0,
+    "view_count": 4,
     "category": "programming",
     "tags": [
       "Codex"
     ]
+  },
+  {
+    "title": "AI 编程时代的“代码守门员”,CodeRabbit 上手体验!",
+    "url": "https://mp.weixin.qq.com/s?src=11&timestamp=1763946613&ver=6377&signature=TZEitY9QWR13bV9wA0SwOYg4F0cm84q74qeosVHF4PYAYKJ2UYvS2YBN-CGbKFX0*GeQU6xyTpRK5K6XMP1x3GEusiXLToPUc5YH-SkZ3cmG6p2eW7yIGpxqA6mMybTs&new=1",
+    "source": "100kwhy",
+    "summary": "为了减少人工审查负担,提升整体开发质量,CodeRabbit 应运而生.CodeRabbit 是什么?如果要用一句最直接的方式来描述 ...",
+    "tags": [
+      "coderabbit"
+    ],
+    "tool_tags": [
+      "coderabbit"
+    ],
+    "score": 8.0,
+    "id": 7,
+    "created_at": "2025-11-24T09:25:58.016542Z",
+    "published_time": "2025-11-24T09:25:58.016542Z",
+    "archived_at": "2025-11-24T09:25:58.016542Z",
+    "view_count": 0,
+    "category": "programming"
+  },
+  {
+    "title": "Cursor常见问题解答——中文汉化、",
+    "url": "https://mp.weixin.qq.com/s?src=11&timestamp=1763946423&ver=6377&signature=EHpUXLob5uJO87jr6*S7GBLv7uQ*XS2k5ycRYbu6Y4LnnEY8bAFNvQrGxYt2FLM2XEjXLROaJvrvHMknryNCtQYm12w43-YKQBuOlbimRQidQGGtcQwPE7tAjrHoL8o9&new=1",
+    "source": "100kwhy",
+    "summary": "一、Cursor软件汉化1.首先打开Cursor软件,然后按下组合键Ctrl + Shift + P,打开命令面板.图1- 命令面板2.在输入框输入命令“...",
+    "tags": [
+      "Cursor"
+    ],
+    "tool_tags": [
+      "Cursor"
+    ],
+    "score": 8.0,
+    "id": 9,
+    "created_at": "2025-11-24T09:26:45.809928Z",
+    "published_time": "2025-11-24T09:26:45.809928Z",
+    "archived_at": "2025-11-24T09:26:45.809928Z",
+    "view_count": 0,
+    "category": "programming"
+  },
+  {
+    "title": "谈Codex-Max模型的自动Context压缩",
+    "url": "https://mp.weixin.qq.com/s?src=11&timestamp=1763946396&ver=6377&signature=9IEc*nCT4h1IFSdTGROhA-2xoMTDd8RTrJ7xKd4zjOiGqOofI0rAikP*YwaI0Hw7k-ppvZZFrGl*x9X8HYkll9gn467-LQeLgIjkRPQtsfSZ445QwAW*kosFm799Bn7f&new=1",
+    "source": "100kwhy",
+    "summary": "本文主要分析GPT‑5.1-Codex-Max模型的自动context压缩功能.它的发布文网址是https://openai.com/index/gpt-5-1-codex-max/其中提...",
+    "tags": [
+      "Codex"
+    ],
+    "tool_tags": [
+      "Codex"
+    ],
+    "score": 8.0,
+    "id": 10,
+    "created_at": "2025-11-24T09:27:04.539335Z",
+    "published_time": "2025-11-24T09:27:04.539335Z",
+    "archived_at": "2025-11-24T09:27:04.539335Z",
+    "view_count": 0,
+    "category": "programming"
   }
 ]

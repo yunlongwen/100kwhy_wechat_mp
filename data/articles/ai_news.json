@@ -1,1 +1,40 @@
-[]
+[
+  {
+    "title": "谷歌预览Code Wiki:你能信任AI来记录你的代码库吗?",
+    "url": "https://mp.weixin.qq.com/s?src=11&timestamp=1763946620&ver=6377&signature=6DpwhWtCHkyzzUARMobbsqyGZJKJj5jnthkmjW8tjRuPB66EWmw3GU34zhnVsa05oG6LwvcVBA57vzlyEOx4j8fenHPs4z6xoQELtzzk8tcjBrOtPGhR2YYti4OYYcx3&new=1",
+    "source": "100kwhy",
+    "summary": "Code Wiki 专注于为代码库中的代码生成文档,而不是针对代码的输出生成文档.例如,我们看了该服务为微软 ASP.NET Core Web ...",
+    "tags": [
+      "codewiki"
+    ],
+    "tool_tags": [
+      "codewiki"
+    ],
+    "score": 8.0,
+    "id": 6,
+    "created_at": "2025-11-24T09:25:18.845965Z",
+    "published_time": "2025-11-24T09:25:18.845965Z",
+    "archived_at": "2025-11-24T09:25:18.845965Z",
+    "view_count": 1,
+    "category": "ai_news"
+  },
+  {
+    "title": "PearAI: Your LLM Pair, Powered by an LLM",
+    "url": "https://mp.weixin.qq.com/s?src=11&timestamp=1763946535&ver=6377&signature=w4KrBbkBFJFMlBby1rUhifm1klf1JqOC4IURYqBsBBfTGuX1QDwn-lP7xsJEvUa1aOC-2T2Gl20uBXE*S33c40AsurvoMFbXm*dBvG5xK1*kXVbw3VEA0oebjBegmFAN&new=1",
+    "source": "100kwhy",
+    "summary": "pearai.exe)传统路径:看到一长串软件列表,靠人脑记忆和经验猜测用户习惯.新路径:将列表直接丢给AI,让它进行多维度专业分...",
+    "tags": [
+      "PearAI"
+    ],
+    "tool_tags": [
+      "PearAI"
+    ],
+    "score": 8.0,
+    "id": 8,
+    "created_at": "2025-11-24T09:26:38.809205Z",
+    "published_time": "2025-11-24T09:26:38.809205Z",
+    "archived_at": "2025-11-24T09:26:38.809205Z",
+    "view_count": 1,
+    "category": "ai_news"
+  }
+]
