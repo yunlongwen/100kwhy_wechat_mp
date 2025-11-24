@@ -54,6 +54,7 @@ from ..sources.tool_candidates import (
     save_candidate_pool as save_tool_candidate_pool,
     CandidateTool,
 )
+from ..services.weekly_digest import update_weekly_digest
 import json
 from pathlib import Path
 
@@ -353,6 +354,10 @@ async def accept_candidate(request: CandidateActionRequest, admin: None = Depend
             remaining_candidates.append(candidate_to_accept)
             save_candidate_pool(candidates)
             raise HTTPException(status_code=500, detail="归档文章失败")
+        
+        # 更新周报
+        update_weekly_digest()
+        
         return {"ok": True, "message": "文章已成功归档到编程资讯。"}
     else:
         # 推送定时爬取的资讯：添加到推送列表（ai_articles.json）
@@ -456,6 +461,9 @@ async def archive_candidate(request: ArchiveArticleRequest, admin: None = Depend
     
     if not success:
         raise HTTPException(status_code=500, detail="归档失败，请查看服务器日志")
+    
+    # 更新周报
+    update_weekly_digest()
     
     # 注意：归档后不删除候选池中的文章，保留以便后续采纳
     

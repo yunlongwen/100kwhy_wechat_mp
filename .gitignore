@@ -42,6 +42,11 @@ env.sh
 *.log
 .genlines
 debug/
+logs/
+!logs/.gitkeep
+
+# Weekly digest files are backed up daily with data/ directory
+# No need to ignore them
 
 # OS
 .DS_Store

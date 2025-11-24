@@ -1,5 +1,6 @@
 import asyncio
 import sys
+import subprocess
 
 # On Windows, the default asyncio event loop (ProactorEventLoop) does not support
 # subprocesses, which Playwright needs to launch browsers.
@@ -10,7 +11,7 @@ if sys.platform == "win32":
 from contextlib import asynccontextmanager
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Tuple
 from dotenv import load_dotenv
 
 # 在所有模块导入前，从 .env 文件加载环境变量
@@ -29,6 +30,73 @@ from fastapi.staticfiles import StaticFiles
 from loguru import logger
 
 from .config_loader import load_digest_schedule, load_crawler_keywords
+
+
+def setup_logging():
+    """
+    配置日志系统，将日志保存到文件
+    """
+    # 创建 logs 目录
+    project_root = Path(__file__).resolve().parent.parent
+    logs_dir = project_root / "logs"
+    logs_dir.mkdir(exist_ok=True)
+    
+    # 移除默认的控制台输出（如果需要的话，可以保留）
+    # logger.remove()
+    
+    # 配置主日志文件（所有日志）
+    # 按日期轮转，保留30天，压缩旧日志
+    logger.add(
+        logs_dir / "app_{time:YYYY-MM-DD}.log",
+        rotation="00:00",  # 每天午夜轮转
+        retention="30 days",  # 保留30天
+        compression="zip",  # 压缩旧日志
+        encoding="utf-8",
+        level="INFO",
+        format="{time:YYYY-MM-DD HH:mm:ss.SSS} | {level: <8} | {name}:{function}:{line} | {message}",
+        enqueue=True,  # 异步写入，避免阻塞
+    )
+    
+    # 配置错误日志文件（只记录 ERROR 及以上级别）
+    logger.add(
+        logs_dir / "error_{time:YYYY-MM-DD}.log",
+        rotation="00:00",
+        retention="90 days",  # 错误日志保留更久
+        compression="zip",
+        encoding="utf-8",
+        level="ERROR",
+        format="{time:YYYY-MM-DD HH:mm:ss.SSS} | {level: <8} | {name}:{function}:{line} | {message}",
+        enqueue=True,
+    )
+    
+    # 配置定时任务专用日志文件（包含关键前缀的日志）
+    # 使用过滤器只记录定时任务相关的日志
+    def scheduler_filter(record):
+        """过滤定时任务相关的日志"""
+        message = record["message"]
+        return any(
+            prefix in message
+            for prefix in [
+                "[定时推送]",
+                "[自动抓取]",
+                "[数据备份]",
+                "[调度器]",
+            ]
+        )
+    
+    logger.add(
+        logs_dir / "scheduler_{time:YYYY-MM-DD}.log",
+        rotation="00:00",
+        retention="90 days",  # 定时任务日志保留更久
+        compression="zip",
+        encoding="utf-8",
+        level="INFO",
+        filter=scheduler_filter,  # 只记录定时任务相关日志
+        format="{time:YYYY-MM-DD HH:mm:ss.SSS} | {level: <8} | {message}",
+        enqueue=True,
+    )
+    
+    logger.info("日志系统已配置，日志文件保存在 logs/ 目录")
 from .notifier.wecom import build_wecom_digest_markdown, send_markdown_to_wecom
 from .routes import wechat, digest
 from .sources.ai_articles import pick_daily_ai_articles, todays_theme, clear_articles, save_article_to_config, get_all_articles
@@ -123,6 +191,122 @@ async def crawl_and_pick_articles_by_keywords() -> int:
         return 0
 
 
+async def job_backup_data_to_github() -> None:
+    """
+    定时任务：将 data/ 和 config/ 目录的数据提交到 GitHub
+    每天 23:00 执行
+    """
+    try:
+        now = datetime.now()
+        logger.info(f"[数据备份] 开始执行数据备份任务，时间: {now.strftime('%Y-%m-%d %H:%M:%S')}")
+        
+        # 获取项目根目录
+        project_root = Path(__file__).resolve().parent.parent
+        
+        # 检查是否是 Git 仓库
+        git_dir = project_root / ".git"
+        if not git_dir.exists():
+            logger.warning("[数据备份] 当前目录不是 Git 仓库，跳过备份")
+            return
+        
+        # 切换到项目根目录执行 Git 命令
+        def run_git_command(cmd: list) -> Tuple[str, str, int]:
+            """执行 Git 命令"""
+            try:
+                result = subprocess.run(
+                    cmd,
+                    cwd=str(project_root),
+                    capture_output=True,
+                    text=True,
+                    encoding='utf-8',
+                    timeout=60
+                )
+                return result.stdout, result.stderr, result.returncode
+            except subprocess.TimeoutExpired:
+                logger.error("[数据备份] Git 命令执行超时")
+                return "", "Timeout", -1
+            except Exception as e:
+                logger.error(f"[数据备份] Git 命令执行失败: {e}")
+                return "", str(e), -1
+        
+        # 1. 检查是否有变更
+        stdout, stderr, code = await asyncio.to_thread(
+            run_git_command, 
+            ["git", "status", "--porcelain", "data/", "config/"]
+        )
+        
+        if code != 0:
+            logger.error(f"[数据备份] 检查 Git 状态失败: {stderr}")
+            return
+        
+        if not stdout.strip():
+            logger.info("[数据备份] data/ 和 config/ 目录没有变更，跳过提交")
+            return
+        
+        # 2. 添加变更的文件
+        logger.info("[数据备份] 添加变更的文件...")
+        stdout, stderr, code = await asyncio.to_thread(
+            run_git_command,
+            ["git", "add", "data/", "config/"]
+        )
+        
+        if code != 0:
+            logger.error(f"[数据备份] 添加文件失败: {stderr}")
+            return
+        
+        # 3. 提交变更
+        commit_message = f"chore: auto backup data and config - {now.strftime('%Y-%m-%d %H:%M:%S')}"
+        logger.info(f"[数据备份] 提交变更: {commit_message}")
+        stdout, stderr, code = await asyncio.to_thread(
+            run_git_command,
+            ["git", "commit", "-m", commit_message]
+        )
+        
+        if code != 0:
+            if "nothing to commit" in stderr.lower() or "nothing to commit" in stdout.lower():
+                logger.info("[数据备份] 没有需要提交的变更")
+                return
+            logger.error(f"[数据备份] 提交失败: {stderr}")
+            return
+        
+        logger.info(f"[数据备份] 提交成功: {stdout.strip()}")
+        
+        # 4. 推送到远程仓库
+        logger.info("[数据备份] 推送到远程仓库...")
+        stdout, stderr, code = await asyncio.to_thread(
+            run_git_command,
+            ["git", "push", "origin", "master"]
+        )
+        
+        if code != 0:
+            logger.error(f"[数据备份] 推送失败: {stderr}")
+            # 如果推送失败，尝试拉取最新代码后再推送
+            logger.info("[数据备份] 尝试拉取最新代码...")
+            stdout, stderr, code = await asyncio.to_thread(
+                run_git_command,
+                ["git", "pull", "origin", "master", "--rebase"]
+            )
+            if code == 0:
+                logger.info("[数据备份] 拉取成功，重新推送...")
+                stdout, stderr, code = await asyncio.to_thread(
+                    run_git_command,
+                    ["git", "push", "origin", "master"]
+                )
+                if code == 0:
+                    logger.info("[数据备份] 推送成功")
+                else:
+                    logger.error(f"[数据备份] 重新推送失败: {stderr}")
+            else:
+                logger.error(f"[数据备份] 拉取失败: {stderr}")
+            return
+        
+        logger.info(f"[数据备份] 推送成功: {stdout.strip()}")
+        logger.info("[数据备份] 数据备份任务执行成功")
+        
+    except Exception as e:
+        logger.error(f"[数据备份] 数据备份任务执行失败: {e}", exc_info=True)
+
+
 async def job_send_daily_ai_digest(digest_count: int) -> None:
     """Send AI coding articles digest to WeCom group."""
     try:
@@ -189,6 +373,11 @@ async def lifespan(app: FastAPI):
     """应用生命周期管理：启动时启动 scheduler，关闭时关闭 scheduler"""
     global scheduler
 
+    # 配置日志系统
+    setup_logging()
+    logger.info("=" * 80)
+    logger.info("应用启动，初始化日志系统和调度器...")
+    
     # 从配置文件加载定时任务参数
     schedule = load_digest_schedule()
     digest_hour = schedule.hour
@@ -231,6 +420,17 @@ async def lifespan(app: FastAPI):
             digest_count,
         )
 
+    # 添加数据备份任务：每天 23:00 执行
+    scheduler.add_job(
+        job_backup_data_to_github,
+        "cron",
+        hour=23,
+        minute=0,
+        id="daily_data_backup",
+        replace_existing=True,
+    )
+    logger.info("[调度器] 已添加数据备份任务，每日 23:00 执行")
+    
     scheduler.start()
     logger.info("[调度器] 调度器已启动，等待触发定时任务...")
 
