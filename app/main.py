@@ -1,4 +1,5 @@
 import asyncio
+import os
 import sys
 import subprocess
 
@@ -107,6 +108,9 @@ import random
 # 全局 scheduler 实例
 scheduler: Optional[AsyncIOScheduler] = None
 
+# 任务执行锁，防止并发执行
+_digest_job_lock = asyncio.Lock()
+
 
 async def crawl_and_pick_articles_by_keywords() -> int:
     """
@@ -210,16 +214,25 @@ async def job_backup_data_to_github() -> None:
             return
         
         # 切换到项目根目录执行 Git 命令
-        def run_git_command(cmd: list) -> Tuple[str, str, int]:
+        def run_git_command(cmd: list, env: dict = None) -> Tuple[str, str, int]:
             """执行 Git 命令"""
             try:
+                # 确保使用 HTTPS 协议，避免 SSH host key 验证问题
+                cmd_env = os.environ.copy()
+                if env:
+                    cmd_env.update(env)
+                # 强制使用 HTTPS，禁用 SSH
+                cmd_env['GIT_SSH_COMMAND'] = ''
+                cmd_env['GIT_TERMINAL_PROMPT'] = '0'
+                
                 result = subprocess.run(
                     cmd,
                     cwd=str(project_root),
                     capture_output=True,
                     text=True,
                     encoding='utf-8',
-                    timeout=60
+                    timeout=60,
+                    env=cmd_env
                 )
                 return result.stdout, result.stderr, result.returncode
             except subprocess.TimeoutExpired:
@@ -273,13 +286,38 @@ async def job_backup_data_to_github() -> None:
         
         # 4. 推送到远程仓库
         logger.info("[数据备份] 推送到远程仓库...")
+        # 获取远程仓库 URL，确保使用 HTTPS
+        stdout, stderr, code = await asyncio.to_thread(
+            run_git_command,
+            ["git", "config", "--get", "remote.origin.url"]
+        )
+        remote_url = stdout.strip() if code == 0 else ""
+        
+        # 如果远程 URL 是 SSH 格式，转换为 HTTPS
+        if remote_url.startswith("git@") or remote_url.startswith("ssh://"):
+            logger.warning(f"[数据备份] 检测到 SSH 格式的远程 URL，尝试转换为 HTTPS: {remote_url}")
+            # 将 git@github.com:user/repo.git 转换为 https://github.com/user/repo.git
+            if "git@" in remote_url:
+                remote_url = remote_url.replace("git@github.com:", "https://github.com/")
+            elif remote_url.startswith("ssh://"):
+                remote_url = remote_url.replace("ssh://git@github.com/", "https://github.com/")
+            logger.info(f"[数据备份] 转换后的 URL: {remote_url}")
+        
         stdout, stderr, code = await asyncio.to_thread(
             run_git_command,
             ["git", "push", "origin", "master"]
         )
         
         if code != 0:
-            logger.error(f"[数据备份] 推送失败: {stderr}")
+            # 检查是否是 SSH host key 验证错误
+            if "Host key verification failed" in stderr or "host key" in stderr.lower():
+                logger.error(f"[数据备份] 推送失败: SSH host key 验证失败")
+                logger.error(f"[数据备份] 错误详情: {stderr}")
+                logger.warning("[数据备份] 提示: 请确保远程仓库使用 HTTPS 协议，或配置 SSH host key")
+                logger.warning("[数据备份] 解决方案: 运行 'git remote set-url origin https://github.com/...' 切换到 HTTPS")
+            else:
+                logger.error(f"[数据备份] 推送失败: {stderr}")
+            
             # 如果推送失败，尝试拉取最新代码后再推送
             logger.info("[数据备份] 尝试拉取最新代码...")
             stdout, stderr, code = await asyncio.to_thread(
@@ -295,9 +333,17 @@ async def job_backup_data_to_github() -> None:
                 if code == 0:
                     logger.info("[数据备份] 推送成功")
                 else:
-                    logger.error(f"[数据备份] 重新推送失败: {stderr}")
+                    if "Host key verification failed" in stderr or "host key" in stderr.lower():
+                        logger.error(f"[数据备份] 重新推送失败: SSH host key 验证失败")
+                        logger.error(f"[数据备份] 错误详情: {stderr}")
+                    else:
+                        logger.error(f"[数据备份] 重新推送失败: {stderr}")
             else:
-                logger.error(f"[数据备份] 拉取失败: {stderr}")
+                if "Host key verification failed" in stderr or "host key" in stderr.lower():
+                    logger.error(f"[数据备份] 拉取失败: SSH host key 验证失败")
+                    logger.error(f"[数据备份] 错误详情: {stderr}")
+                else:
+                    logger.error(f"[数据备份] 拉取失败: {stderr}")
             return
         
         logger.info(f"[数据备份] 推送成功: {stdout.strip()}")
@@ -309,63 +355,69 @@ async def job_backup_data_to_github() -> None:
 
 async def job_send_daily_ai_digest(digest_count: int) -> None:
     """Send AI coding articles digest to WeCom group."""
-    try:
-        now = datetime.now()
-        logger.info(f"[定时推送] 开始执行定时推送任务，时间: {now.strftime('%Y-%m-%d %H:%M:%S')}, 目标篇数: {digest_count}")
-        
-        articles = pick_daily_ai_articles(k=digest_count)
-        if not articles:
-            logger.info("[定时推送] 文章池为空，尝试从候选池提升文章...")
-            promoted = promote_candidates_to_articles(per_keyword=2)
-            if promoted:
-                logger.info(f"[定时推送] 从候选池提升了 {promoted} 篇文章")
-                articles = pick_daily_ai_articles(k=digest_count)
-        
-        # 如果文章池和候选池都为空，按关键字抓取文章
-        if not articles:
-            logger.info("[定时推送] 文章池和候选池都为空，开始按关键字自动抓取文章...")
-            crawled_count = await crawl_and_pick_articles_by_keywords()
-            if crawled_count > 0:
-                logger.info(f"[定时推送] 自动抓取成功，获得 {crawled_count} 篇文章")
-                articles = pick_daily_ai_articles(k=digest_count)
-            else:
-                logger.warning("[定时推送] 自动抓取失败或未找到新文章，跳过推送")
+    # 使用锁防止并发执行
+    if _digest_job_lock.locked():
+        logger.warning("[定时推送] 检测到任务正在执行中，跳过本次执行以避免重复推送")
+        return
+    
+    async with _digest_job_lock:
+        try:
+            now = datetime.now()
+            logger.info(f"[定时推送] 开始执行定时推送任务，时间: {now.strftime('%Y-%m-%d %H:%M:%S')}, 目标篇数: {digest_count}")
+            
+            articles = pick_daily_ai_articles(k=digest_count)
+            if not articles:
+                logger.info("[定时推送] 文章池为空，尝试从候选池提升文章...")
+                promoted = promote_candidates_to_articles(per_keyword=2)
+                if promoted:
+                    logger.info(f"[定时推送] 从候选池提升了 {promoted} 篇文章")
+                    articles = pick_daily_ai_articles(k=digest_count)
+            
+            # 如果文章池和候选池都为空，按关键字抓取文章
+            if not articles:
+                logger.info("[定时推送] 文章池和候选池都为空，开始按关键字自动抓取文章...")
+                crawled_count = await crawl_and_pick_articles_by_keywords()
+                if crawled_count > 0:
+                    logger.info(f"[定时推送] 自动抓取成功，获得 {crawled_count} 篇文章")
+                    articles = pick_daily_ai_articles(k=digest_count)
+                else:
+                    logger.warning("[定时推送] 自动抓取失败或未找到新文章，跳过推送")
+                    return
+
+            if not articles:
+                logger.warning("[定时推送] 文章池为空且无法获取文章，跳过推送")
                 return
 
-        if not articles:
-            logger.warning("[定时推送] 文章池为空且无法获取文章，跳过推送")
-            return
+            logger.info(f"[定时推送] 准备推送 {len(articles)} 篇文章")
+            theme = todays_theme(now)
+            date_str = now.strftime("%Y-%m-%d")
+            items = [
+                {
+                    "title": a.title,
+                    "url": a.url,
+                    "source": a.source,
+                    "summary": a.summary,
+                }
+                for a in articles
+            ]
 
-        logger.info(f"[定时推送] 准备推送 {len(articles)} 篇文章")
-        theme = todays_theme(now)
-        date_str = now.strftime("%Y-%m-%d")
-        items = [
-            {
-                "title": a.title,
-                "url": a.url,
-                "source": a.source,
-                "summary": a.summary,
-            }
-            for a in articles
-        ]
-
-        content = build_wecom_digest_markdown(date_str=date_str, theme=theme, items=items)
-        logger.info("[定时推送] 正在发送到企业微信群...")
-        success = await send_markdown_to_wecom(content)
-        if not success:
-            logger.error("[定时推送] 推送失败，但继续清理文章池和候选池")
-        else:
-            logger.info("[定时推送] 推送成功")
-        
-        logger.info("[定时推送] 正在清理文章池和候选池...")
-        clear_articles()
-        clear_candidate_pool()
-        if success:
-            logger.info("[定时推送] 定时推送任务执行成功")
-        else:
-            logger.warning("[定时推送] 定时推送任务完成，但推送失败")
-    except Exception as e:
-        logger.error(f"[定时推送] 定时推送任务执行失败: {e}", exc_info=True)
+            content = build_wecom_digest_markdown(date_str=date_str, theme=theme, items=items)
+            logger.info("[定时推送] 正在发送到企业微信群...")
+            success = await send_markdown_to_wecom(content)
+            if not success:
+                logger.error("[定时推送] 推送失败，但继续清理文章池和候选池")
+            else:
+                logger.info("[定时推送] 推送成功")
+            
+            logger.info("[定时推送] 正在清理文章池和候选池...")
+            clear_articles()
+            clear_candidate_pool()
+            if success:
+                logger.info("[定时推送] 定时推送任务执行成功")
+            else:
+                logger.warning("[定时推送] 定时推送任务完成，但推送失败")
+        except Exception as e:
+            logger.error(f"[定时推送] 定时推送任务执行失败: {e}", exc_info=True)
 
 
 @asynccontextmanager
@@ -378,6 +430,16 @@ async def lifespan(app: FastAPI):
     logger.info("=" * 80)
     logger.info("应用启动，初始化日志系统和调度器...")
     
+    # 如果调度器已存在，先关闭它（防止热重载时重复初始化）
+    if scheduler is not None:
+        try:
+            if scheduler.running:
+                logger.warning("[调度器] 检测到已有调度器在运行，正在关闭...")
+                scheduler.shutdown(wait=False)
+        except Exception as e:
+            logger.warning(f"[调度器] 关闭旧调度器时出错: {e}")
+        scheduler = None
+    
     # 从配置文件加载定时任务参数
     schedule = load_digest_schedule()
     digest_hour = schedule.hour
@@ -386,8 +448,11 @@ async def lifespan(app: FastAPI):
 
     # 启动时
     scheduler = AsyncIOScheduler(timezone="Asia/Shanghai")
+    logger.info("[调度器] 调度器实例已创建")
 
     # 配置触发器：优先使用 cron 表达式
+    # 注意：在启动前添加任务，启动后会自动调度
+    
     if schedule.cron:
         trigger = CronTrigger.from_crontab(schedule.cron, timezone="Asia/Shanghai")
         scheduler.add_job(
@@ -398,7 +463,7 @@ async def lifespan(app: FastAPI):
             replace_existing=True,
         )
         logger.info(
-            "[调度器] 已启动，使用 cron 表达式: %r, 每次推送 %d 篇文章",
+            "[调度器] 已添加推送任务，使用 cron 表达式: %r, 每次推送 %d 篇文章",
             schedule.cron,
             digest_count,
         )
@@ -413,12 +478,19 @@ async def lifespan(app: FastAPI):
             replace_existing=True,
         )
         logger.info(
-            "[调度器] 已启动，每日推送时间: %02d:%02d (Asia/Shanghai), "
+            "[调度器] 已添加推送任务，每日推送时间: %02d:%02d (Asia/Shanghai), "
             "每次推送 %d 篇文章",
             digest_hour,
             digest_minute,
             digest_count,
         )
+    
+    # 验证任务是否已正确添加
+    job = scheduler.get_job("daily_ai_digest")
+    if job:
+        logger.info(f"[调度器] 推送任务已确认添加，下次执行时间: {job.next_run_time}")
+    else:
+        logger.error("[调度器] 警告：推送任务添加失败，未找到任务！")
 
     # 添加数据备份任务：每天 23:00 执行
     scheduler.add_job(
@@ -431,15 +503,30 @@ async def lifespan(app: FastAPI):
     )
     logger.info("[调度器] 已添加数据备份任务，每日 23:00 执行")
     
+    # 启动调度器
     scheduler.start()
+    
+    # 列出所有已添加的任务（启动后才能获取 next_run_time）
+    all_jobs = scheduler.get_jobs()
+    logger.info(f"[调度器] 当前共有 {len(all_jobs)} 个定时任务:")
+    for job in all_jobs:
+        logger.info(f"[调度器]   - {job.id}: 下次执行时间 = {job.next_run_time}")
     logger.info("[调度器] 调度器已启动，等待触发定时任务...")
 
     yield  # 应用运行期间
 
     # 关闭时
-    if scheduler:
-        scheduler.shutdown()
-        logger.info("Scheduler stopped.")
+    if scheduler is not None:
+        try:
+            if scheduler.running:
+                scheduler.shutdown(wait=True)
+                logger.info("[调度器] 调度器已关闭")
+            else:
+                logger.info("[调度器] 调度器未运行，无需关闭")
+        except Exception as e:
+            logger.error(f"[调度器] 关闭调度器时出错: {e}")
+        finally:
+            scheduler = None
 
 
 def create_app() -> FastAPI:
