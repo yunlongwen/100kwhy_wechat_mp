@@ -307,9 +307,9 @@ async def job_backup_data_to_github() -> None:
                 cmd_env = os.environ.copy()
                 if env:
                     cmd_env.update(env)
-                # 强制使用 HTTPS，禁用 SSH
-                cmd_env['GIT_SSH_COMMAND'] = ''
+                # 禁用交互式提示
                 cmd_env['GIT_TERMINAL_PROMPT'] = '0'
+                # 注意：不设置 GIT_SSH_COMMAND 为空，因为空字符串会导致错误
                 
                 result = subprocess.run(
                     cmd,
@@ -379,15 +379,27 @@ async def job_backup_data_to_github() -> None:
         )
         remote_url = stdout.strip() if code == 0 else ""
         
-        # 如果远程 URL 是 SSH 格式，转换为 HTTPS
+        # 如果远程 URL 是 SSH 格式，转换为 HTTPS 并更新 git remote
         if remote_url.startswith("git@") or remote_url.startswith("ssh://"):
             logger.warning(f"[数据备份] 检测到 SSH 格式的远程 URL，尝试转换为 HTTPS: {remote_url}")
             # 将 git@github.com:user/repo.git 转换为 https://github.com/user/repo.git
+            https_url = remote_url
             if "git@" in remote_url:
-                remote_url = remote_url.replace("git@github.com:", "https://github.com/")
+                https_url = remote_url.replace("git@github.com:", "https://github.com/")
             elif remote_url.startswith("ssh://"):
-                remote_url = remote_url.replace("ssh://git@github.com/", "https://github.com/")
-            logger.info(f"[数据备份] 转换后的 URL: {remote_url}")
+                https_url = remote_url.replace("ssh://git@github.com/", "https://github.com/")
+            logger.info(f"[数据备份] 转换后的 URL: {https_url}")
+            
+            # 更新 git remote URL 为 HTTPS
+            logger.info("[数据备份] 更新远程仓库 URL 为 HTTPS...")
+            stdout, stderr, code = await asyncio.to_thread(
+                run_git_command,
+                ["git", "remote", "set-url", "origin", https_url]
+            )
+            if code != 0:
+                logger.warning(f"[数据备份] 更新远程 URL 失败: {stderr}，继续尝试推送")
+            else:
+                logger.info("[数据备份] 远程 URL 已更新为 HTTPS")
         
         stdout, stderr, code = await asyncio.to_thread(
             run_git_command,
