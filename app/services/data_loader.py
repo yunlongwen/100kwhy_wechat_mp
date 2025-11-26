@@ -623,10 +623,11 @@ class DataLoader:
             url = url.strip()
             
             # 遍历所有文章文件，检查URL是否存在
-            # 注意：只检查正式归档的文章文件，不包括候选池文件
+            # 注意：只检查正式归档的文章文件，不包括候选池和文章池文件
             for article_file in ARTICLES_DIR.glob("*.json"):
-                # 排除候选池文件
-                if article_file.name in ["ai_candidates.json"]:
+                # 排除候选池文件和文章池文件（文章池不是归档文件）
+                # 归档文件应该是 programming.json, ai_news.json 等资讯列表文件
+                if article_file.name in ["ai_candidates.json", "ai_articles.json"]:
                     continue
                 
                 articles = DataLoader._load_json_file(article_file)
