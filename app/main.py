@@ -303,13 +303,11 @@ async def job_backup_data_to_github() -> None:
         def run_git_command(cmd: list, env: dict = None) -> Tuple[str, str, int]:
             """执行 Git 命令"""
             try:
-                # 确保使用 HTTPS 协议，避免 SSH host key 验证问题
                 cmd_env = os.environ.copy()
                 if env:
                     cmd_env.update(env)
                 # 禁用交互式提示
                 cmd_env['GIT_TERMINAL_PROMPT'] = '0'
-                # 注意：不设置 GIT_SSH_COMMAND 为空，因为空字符串会导致错误
                 
                 result = subprocess.run(
                     cmd,
@@ -372,34 +370,14 @@ async def job_backup_data_to_github() -> None:
         
         # 4. 推送到远程仓库
         logger.info("[数据备份] 推送到远程仓库...")
-        # 获取远程仓库 URL，确保使用 HTTPS
+        # 获取远程仓库 URL，支持 SSH 和 HTTPS
         stdout, stderr, code = await asyncio.to_thread(
             run_git_command,
             ["git", "config", "--get", "remote.origin.url"]
         )
         remote_url = stdout.strip() if code == 0 else ""
-        
-        # 如果远程 URL 是 SSH 格式，转换为 HTTPS 并更新 git remote
-        if remote_url.startswith("git@") or remote_url.startswith("ssh://"):
-            logger.warning(f"[数据备份] 检测到 SSH 格式的远程 URL，尝试转换为 HTTPS: {remote_url}")
-            # 将 git@github.com:user/repo.git 转换为 https://github.com/user/repo.git
-            https_url = remote_url
-            if "git@" in remote_url:
-                https_url = remote_url.replace("git@github.com:", "https://github.com/")
-            elif remote_url.startswith("ssh://"):
-                https_url = remote_url.replace("ssh://git@github.com/", "https://github.com/")
-            logger.info(f"[数据备份] 转换后的 URL: {https_url}")
-            
-            # 更新 git remote URL 为 HTTPS
-            logger.info("[数据备份] 更新远程仓库 URL 为 HTTPS...")
-            stdout, stderr, code = await asyncio.to_thread(
-                run_git_command,
-                ["git", "remote", "set-url", "origin", https_url]
-            )
-            if code != 0:
-                logger.warning(f"[数据备份] 更新远程 URL 失败: {stderr}，继续尝试推送")
-            else:
-                logger.info("[数据备份] 远程 URL 已更新为 HTTPS")
+        if remote_url:
+            logger.info(f"[数据备份] 使用远程仓库 URL: {remote_url}")
         
         stdout, stderr, code = await asyncio.to_thread(
             run_git_command,
@@ -411,8 +389,8 @@ async def job_backup_data_to_github() -> None:
             if "Host key verification failed" in stderr or "host key" in stderr.lower():
                 logger.error(f"[数据备份] 推送失败: SSH host key 验证失败")
                 logger.error(f"[数据备份] 错误详情: {stderr}")
-                logger.warning("[数据备份] 提示: 请确保远程仓库使用 HTTPS 协议，或配置 SSH host key")
-                logger.warning("[数据备份] 解决方案: 运行 'git remote set-url origin https://github.com/...' 切换到 HTTPS")
+                logger.warning("[数据备份] 提示: 请确保 SSH 密钥已添加到 GitHub，或配置 SSH host key")
+                logger.warning("[数据备份] 解决方案: 访问 https://github.com/settings/keys 添加 SSH 公钥")
             else:
                 logger.error(f"[数据备份] 推送失败: {stderr}")
             
@@ -434,12 +412,14 @@ async def job_backup_data_to_github() -> None:
                     if "Host key verification failed" in stderr or "host key" in stderr.lower():
                         logger.error(f"[数据备份] 重新推送失败: SSH host key 验证失败")
                         logger.error(f"[数据备份] 错误详情: {stderr}")
+                        logger.warning("[数据备份] 提示: 请确保 SSH 密钥已添加到 GitHub")
                     else:
                         logger.error(f"[数据备份] 重新推送失败: {stderr}")
             else:
                 if "Host key verification failed" in stderr or "host key" in stderr.lower():
                     logger.error(f"[数据备份] 拉取失败: SSH host key 验证失败")
                     logger.error(f"[数据备份] 错误详情: {stderr}")
+                    logger.warning("[数据备份] 提示: 请确保 SSH 密钥已添加到 GitHub")
                 else:
                     logger.error(f"[数据备份] 拉取失败: {stderr}")
             return
