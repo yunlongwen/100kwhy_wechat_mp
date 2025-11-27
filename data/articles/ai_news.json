@@ -53,7 +53,7 @@
     "created_at": "2025-11-25T09:18:53.737419Z",
     "published_time": "2025-11-25T09:18:53.737419Z",
     "archived_at": "2025-11-25T09:18:53.737419Z",
-    "view_count": 0,
+    "view_count": 4,
     "category": "ai_news"
   },
   {
@@ -87,7 +87,7 @@
     "created_at": "2025-11-26T08:54:17.030539Z",
     "published_time": "2025-11-26T08:54:17.030539Z",
     "archived_at": "2025-11-26T08:54:17.030539Z",
-    "view_count": 0,
+    "view_count": 2,
     "category": "ai_news"
   },
   {
@@ -102,7 +102,101 @@
     "created_at": "2025-11-26T08:57:52.227663Z",
     "published_time": "2025-11-26T08:57:52.227663Z",
     "archived_at": "2025-11-26T08:57:52.227663Z",
-    "view_count": 3,
+    "view_count": 4,
+    "category": "ai_news"
+  },
+  {
+    "title": "Gemini 3 实测:一个产品经理,能多出多少「影分身」?",
+    "url": "https://mp.weixin.qq.com/s?src=11&timestamp=1764203355&ver=6383&signature=QWtBI78c2YCzUWqXJCwA4LlpZv0vjwEb8L*o6Mq8R1Hmw4Yckc*6V4weSfmYroR**k-c8ZA5aY6auGnjTez7ZCyBppnrXj6g3C4lM6vu01Y*5TupgjOMnYLEbe81XPkW&new=1",
+    "source": "100kwhy",
+    "summary": "大家好,我是阿钱.Gemini 3 正式发布,这一代主打三件事:更强推理、更稳多模态(图文音视频)、更聪明的 Agent 能力.跑分、...",
+    "tags": [],
+    "tool_tags": [],
+    "score": 8.0,
+    "id": 19,
+    "created_at": "2025-11-27T08:48:15.344921Z",
+    "published_time": "2025-11-27T08:48:15.344921Z",
+    "archived_at": "2025-11-27T08:48:15.344921Z",
+    "view_count": 1,
+    "category": "ai_news"
+  },
+  {
+    "title": "TRAE SOLO中国版终于来了，完全免费！",
+    "url": "https://mp.weixin.qq.com/s/AwT_NOL-B555dN8CIcnQbQ",
+    "source": "苍何",
+    "summary": "暂无摘要",
+    "tags": [
+      "Trae"
+    ],
+    "tool_tags": [
+      "Trae"
+    ],
+    "score": 8.0,
+    "id": 20,
+    "created_at": "2025-11-27T09:02:09.009093Z",
+    "published_time": "2025-11-27T09:02:09.009093Z",
+    "archived_at": "2025-11-27T09:02:09.009093Z",
+    "view_count": 5,
+    "category": "ai_news"
+  },
+  {
+    "title": "超全Nano Banana Pro 提示词案例库来啦，小白也能轻松上手",
+    "url": "https://mp.weixin.qq.com/s/jsmsUOqNJh0u0ygRIKpOSA",
+    "source": "苍何",
+    "summary": "Nano Banana Pro 提示词案例库快收藏！！",
+    "tags": [],
+    "tool_tags": [],
+    "score": 8.0,
+    "id": 23,
+    "created_at": "2025-11-28T08:44:02.838464Z",
+    "published_time": "2025-11-28T08:44:02.838464Z",
+    "archived_at": "2025-11-28T08:44:02.838464Z",
+    "view_count": 0,
+    "category": "ai_news"
+  },
+  {
+    "title": "今年最好的国产 AI 浏览器，出现了",
+    "url": "https://mp.weixin.qq.com/s/h3m_DPyfkk2c4J9CR4x0cA",
+    "source": "阿颖",
+    "summary": "暂无摘要",
+    "tags": [],
+    "tool_tags": [],
+    "score": 8.0,
+    "id": 24,
+    "created_at": "2025-11-28T08:45:29.369931Z",
+    "published_time": "2025-11-28T08:45:29.369931Z",
+    "archived_at": "2025-11-28T08:45:29.369931Z",
+    "view_count": 0,
+    "category": "ai_news"
+  },
+  {
+    "title": "将设计转化为代码：Figma Make 与 Anima Playground 大比拼",
+    "url": "https://mp.weixin.qq.com/s/4WYbeI1iRkzAv89K0XCeQA",
+    "source": "Nick益",
+    "summary": "暂无摘要",
+    "tags": [],
+    "tool_tags": [],
+    "score": 8.0,
+    "id": 25,
+    "created_at": "2025-11-28T08:48:12.021076Z",
+    "published_time": "2025-11-28T08:48:12.021076Z",
+    "archived_at": "2025-11-28T08:48:12.021076Z",
+    "view_count": 0,
+    "category": "ai_news"
+  },
+  {
+    "title": "实测用 Claude Code 写小说，意外发现了组队开挂模式",
+    "url": "https://mp.weixin.qq.com/s/lInXMvih3lAiqJDhbTUxxQ",
+    "source": "丸美小沐",
+    "summary": "暂无摘要",
+    "tags": [],
+    "tool_tags": [],
+    "score": 8.0,
+    "id": 27,
+    "created_at": "2025-11-28T08:50:34.414356Z",
+    "published_time": "2025-11-28T08:50:34.414356Z",
+    "archived_at": "2025-11-28T08:50:34.414356Z",
+    "view_count": 0,
     "category": "ai_news"
   }
 ]
