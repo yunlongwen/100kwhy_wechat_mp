@@ -141,5 +141,19 @@
     "is_featured": false,
     "id": 18,
     "identifier": "draw-a-ui"
+  },
+  {
+    "id": 523792,
+    "name": "animaapp",
+    "url": "https://dev.animaapp.com/",
+    "description": "Anima（访问 \ndev.animaapp.com\n）是一款将设计稿（如 Figma 设计）或网页 URL “一键”自动转换为可运行、可编辑、响应式网页／应用代码（React / Vue / HTML + CSS 或 Tailwind 等）的 AI 驱动 “design-to-code” 平台，帮助设计师和开发者从视觉稿快速生成生产就绪代码，极大缩短从“设计”到“上线”的开发周期。",
+    "category": "ui",
+    "tags": [],
+    "icon": "🔧",
+    "score": 0,
+    "view_count": 0,
+    "like_count": 0,
+    "is_featured": false,
+    "created_at": "2025-11-29T07:45:15.027133Z"
   }
 ]

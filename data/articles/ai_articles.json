@@ -1,1 +1,20 @@
-[]
+[
+  {
+    "title": "从代码补全到真实软件的生产级工具：Qoder 如何改写 AI 编程规则",
+    "url": "https://mp.weixin.qq.com/s/0Emq362XrjjFPxb9S8rYeg",
+    "source": "Cynthia",
+    "summary": "​AI coding 80% 的价值都藏在对已有工程的迭代中"
+  },
+  {
+    "title": "驾驭AI：一位全流程工程师的软件工程智能化实践与思考",
+    "url": "https://mp.weixin.qq.com/s/zrfuWfKaF3bkBxUZw5WELg",
+    "source": "梁山河",
+    "summary": "衡量一个开发者价值的，将不再是他/她写了多少行代码，而是他/她通过与AI协作，交付了多少高质量的业务价值。——AI时代的行业新共识"
+  },
+  {
+    "title": "Coding Agent 的真相：90%的时间都在给AI做Code Review",
+    "url": "https://mp.weixin.qq.com/s/ufQDHs-rNkTg9bWBfGnRNg",
+    "source": "37Flow",
+    "summary": "决定写什么的，还是你自己"
+  }
+]
