@@ -11,7 +11,7 @@
     "created_at": "2025-11-26T09:36:28.179960Z",
     "published_time": "2025-11-26T09:36:28.179960Z",
     "archived_at": "2025-11-26T09:36:28.179960Z",
-    "view_count": 52,
+    "view_count": 54,
     "category": "programming"
   },
   {
@@ -26,7 +26,7 @@
     "created_at": "2025-11-27T09:02:23.541259Z",
     "published_time": "2025-11-27T09:02:23.541259Z",
     "archived_at": "2025-11-27T09:02:23.541259Z",
-    "view_count": 23,
+    "view_count": 24,
     "category": "programming"
   },
   {
@@ -45,7 +45,7 @@
     "created_at": "2025-11-28T08:43:49.826240Z",
     "published_time": "2025-11-28T08:43:49.826240Z",
     "archived_at": "2025-11-28T08:43:49.826240Z",
-    "view_count": 9,
+    "view_count": 10,
     "category": "programming"
   },
   {
@@ -64,7 +64,7 @@
     "created_at": "2025-11-28T08:49:44.480854Z",
     "published_time": "2025-11-28T08:49:44.480854Z",
     "archived_at": "2025-11-28T08:49:44.480854Z",
-    "view_count": 16,
+    "view_count": 17,
     "category": "programming"
   },
   {
@@ -113,7 +113,7 @@
     "created_at": "2025-11-29T07:43:38.954155Z",
     "published_time": "2025-11-29T07:43:38.954155Z",
     "archived_at": "2025-11-29T07:43:38.954155Z",
-    "view_count": 11,
+    "view_count": 13,
     "category": "programming"
   },
   {
@@ -167,6 +167,70 @@
     "published_time": "2025-11-30T11:24:32.608317Z",
     "archived_at": "2025-11-30T11:24:32.608317Z",
     "view_count": 4,
+    "category": "programming"
+  },
+  {
+    "title": "2025 年 8 大最佳 AI 编码工具",
+    "url": "https://mp.weixin.qq.com/s?src=11&timestamp=1764551299&ver=6391&signature=bHsBvq-EO5jJ-KQ*oQii8maW5Q6EdNyQgWPAdhAOHwSpmgZyIP3*Jxh*ajTz1UN3YGvjL7YFJI4-rxqAui5Xn0Shdf5abAg*-TP07c*3J2MWFsFrx1Lc0ziI9FlPnSim&new=1",
+    "source": "100kwhy",
+    "summary": "Bolt.new适合:基于浏览器的原型制作与试验.Bolt.new 完全在浏览器中运行,无需本地环境即可快速打样.关键特性:浏览器原生的...",
+    "tags": [
+      "Bolt.new"
+    ],
+    "tool_tags": [
+      "Bolt.new"
+    ],
+    "score": 8.0,
+    "id": 39,
+    "created_at": "2025-12-01T10:36:46.479653Z",
+    "published_time": "2025-12-01T10:36:46.479653Z",
+    "archived_at": "2025-12-01T10:36:46.479653Z",
+    "view_count": 5,
+    "category": "programming"
+  },
+  {
+    "title": "建议收藏！15个提示词，复刻「马斯克」的顶级思维模型",
+    "url": "https://mp.weixin.qq.com/s/NeMeqbnBjmrjznUjv9cP7g",
+    "source": "微信公众平台",
+    "summary": "暂无摘要",
+    "tags": [],
+    "tool_tags": [],
+    "score": 8.0,
+    "id": 40,
+    "created_at": "2025-12-01T10:38:20.074030Z",
+    "published_time": "2025-12-01T10:38:20.074030Z",
+    "archived_at": "2025-12-01T10:38:20.074030Z",
+    "view_count": 0,
+    "category": "programming"
+  },
+  {
+    "title": "AICoding实践：从Prd到代码生成",
+    "url": "https://mp.weixin.qq.com/s/msk1rLwcVsISfNJiTbZZag",
+    "source": "素舒",
+    "summary": "暂无摘要",
+    "tags": [],
+    "tool_tags": [],
+    "score": 8.0,
+    "id": 41,
+    "created_at": "2025-12-01T10:38:24.288802Z",
+    "published_time": "2025-12-01T10:38:24.288802Z",
+    "archived_at": "2025-12-01T10:38:24.288802Z",
+    "view_count": 1,
+    "category": "programming"
+  },
+  {
+    "title": "一开口就是“麦肯锡”范儿？教你用AI打造自己的专属方法论框架！（附Prompt）",
+    "url": "https://mp.weixin.qq.com/s/2D9_aeqKT97Y0D6mGfXpbQ",
+    "source": "甲木Zuiyn",
+    "summary": "这个Prompt，值得收藏！",
+    "tags": [],
+    "tool_tags": [],
+    "score": 8.0,
+    "id": 42,
+    "created_at": "2025-12-01T10:38:30.858445Z",
+    "published_time": "2025-12-01T10:38:30.858445Z",
+    "archived_at": "2025-12-01T10:38:30.858445Z",
+    "view_count": 5,
     "category": "programming"
   }
 ]
