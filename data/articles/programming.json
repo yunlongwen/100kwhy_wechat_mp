@@ -185,7 +185,7 @@
     "created_at": "2025-12-01T10:36:46.479653Z",
     "published_time": "2025-12-01T10:36:46.479653Z",
     "archived_at": "2025-12-01T10:36:46.479653Z",
-    "view_count": 5,
+    "view_count": 7,
     "category": "programming"
   },
   {
@@ -200,7 +200,7 @@
     "created_at": "2025-12-01T10:38:20.074030Z",
     "published_time": "2025-12-01T10:38:20.074030Z",
     "archived_at": "2025-12-01T10:38:20.074030Z",
-    "view_count": 0,
+    "view_count": 1,
     "category": "programming"
   },
   {
@@ -231,6 +231,51 @@
     "published_time": "2025-12-01T10:38:30.858445Z",
     "archived_at": "2025-12-01T10:38:30.858445Z",
     "view_count": 5,
+    "category": "programming"
+  },
+  {
+    "title": "用 AI Native 的方式开发 AI Native 的产品",
+    "url": "https://mp.weixin.qq.com/s/B2KywStpKHh5Vv5heGPrfw",
+    "source": "曹犟",
+    "summary": "Vibe Coding 的核心是重构整个软件开发生命周期的全流程。",
+    "tags": [],
+    "tool_tags": [],
+    "score": 8.0,
+    "id": 43,
+    "created_at": "2025-12-02T13:54:48.151560Z",
+    "published_time": "2025-12-02T13:54:48.151560Z",
+    "archived_at": "2025-12-02T13:54:48.151560Z",
+    "view_count": 0,
+    "category": "programming"
+  },
+  {
+    "title": "Martin Fowler 深度访谈：AI 是软件工程 40 年来的最大变局",
+    "url": "https://mp.weixin.qq.com/s/pBhto12Y8qtNgqzvxhoRJA",
+    "source": "大圣不是圣",
+    "summary": "对于 AI，Martin Fowler 给出了一个极高的评价：这是他职业生涯中见过的最大变革！为何要警惕 Vibe Coding？重构为何更重要？本文深度解读从“确定性”到“非确定性”的思维重塑，带你看清行业未来。",
+    "tags": [],
+    "tool_tags": [],
+    "score": 8.0,
+    "id": 44,
+    "created_at": "2025-12-02T13:55:37.134902Z",
+    "published_time": "2025-12-02T13:55:37.134902Z",
+    "archived_at": "2025-12-02T13:55:37.134902Z",
+    "view_count": 0,
+    "category": "programming"
+  },
+  {
+    "title": "AI for Coding：从 Vibe Coding 到规范驱动开发",
+    "url": "https://mp.weixin.qq.com/s/HaazAEMGqH1GBTmn9qI73g",
+    "source": "自我书写",
+    "summary": "软件开发的未来不再是编写更多的代码，而是指导 AI 编写更好的代码。",
+    "tags": [],
+    "tool_tags": [],
+    "score": 8.0,
+    "id": 45,
+    "created_at": "2025-12-02T13:57:41.993033Z",
+    "published_time": "2025-12-02T13:57:41.993033Z",
+    "archived_at": "2025-12-02T13:57:41.993033Z",
+    "view_count": 0,
     "category": "programming"
   }
 ]
