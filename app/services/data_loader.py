@@ -879,10 +879,13 @@ class DataLoader:
     def get_prompt_content(identifier: str) -> Optional[str]:
         """根据identifier获取提示词内容"""
         try:
-            # 构建md文件路径 (p-{identifier}.md)
-            md_file = DATA_DIR / "prompts" / f"p-{identifier}.md"
-            if md_file.exists():
-                return md_file.read_text(encoding="utf-8")
+            prompts_file = DATA_DIR / "prompts" / "prompts.json"
+            all_prompts = DataLoader._load_json_file(prompts_file)
+
+            # 查找对应的提示词
+            for prompt in all_prompts:
+                if prompt.get("identifier") == identifier:
+                    return prompt.get("content")
         except Exception as e:
             print(f"Error loading prompt content for {identifier}: {e}")
 
