@@ -564,3 +564,88 @@ async def submit_article(request: dict):
         logger.error(f"提交文章失败: {e}")
         raise HTTPException(status_code=500, detail=f"提交失败: {str(e)}")
 
+
+@router.get("/prompts", response_model=PaginatedResponse)
+async def get_prompts(
+    category: Optional[str] = Query(None, description="提示词分类"),
+    page: int = Query(1, ge=1, description="页码"),
+    page_size: int = Query(20, ge=1, le=100, description="每页数量"),
+    search: Optional[str] = Query(None, description="搜索关键词")
+):
+    """获取提示词列表（支持分页和筛选）"""
+    try:
+        prompts, total = DataLoader.get_prompts(
+            category=category,
+            page=page,
+            page_size=page_size,
+            search=search
+        )
+        total_pages = (total + page_size - 1) // page_size
+        return PaginatedResponse(
+            items=prompts,
+            total=total,
+            page=page,
+            page_size=page_size,
+            total_pages=total_pages
+        )
+    except Exception as e:
+        logger.error(f"获取提示词列表失败: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/rules", response_model=PaginatedResponse)
+async def get_rules(
+    category: Optional[str] = Query(None, description="规则分类"),
+    page: int = Query(1, ge=1, description="页码"),
+    page_size: int = Query(20, ge=1, le=100, description="每页数量"),
+    search: Optional[str] = Query(None, description="搜索关键词")
+):
+    """获取规则列表（支持分页和筛选）"""
+    try:
+        rules, total = DataLoader.get_rules(
+            category=category,
+            page=page,
+            page_size=page_size,
+            search=search
+        )
+        total_pages = (total + page_size - 1) // page_size
+        return PaginatedResponse(
+            items=rules,
+            total=total,
+            page=page,
+            page_size=page_size,
+            total_pages=total_pages
+        )
+    except Exception as e:
+        logger.error(f"获取规则列表失败: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/resources", response_model=PaginatedResponse)
+async def get_resources(
+    type: Optional[str] = Query(None, description="资源类型（教程/文章）"),
+    category: Optional[str] = Query(None, description="资源分类"),
+    page: int = Query(1, ge=1, description="页码"),
+    page_size: int = Query(20, ge=1, le=100, description="每页数量"),
+    search: Optional[str] = Query(None, description="搜索关键词")
+):
+    """获取社区资源列表（支持分页和筛选）"""
+    try:
+        resources, total = DataLoader.get_resources(
+            type=type,
+            category=category,
+            page=page,
+            page_size=page_size,
+            search=search
+        )
+        total_pages = (total + page_size - 1) // page_size
+        return PaginatedResponse(
+            items=resources,
+            total=total,
+            page=page,
+            page_size=page_size,
+            total_pages=total_pages
+        )
+    except Exception as e:
+        logger.error(f"获取社区资源列表失败: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))

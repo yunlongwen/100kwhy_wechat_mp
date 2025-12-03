@@ -841,3 +841,112 @@ class DataLoader:
         except Exception as e:
             logger.error(f"保存工具到分类失败: {e}")
             return False
+    
+    @staticmethod
+    def get_prompts(
+        category: Optional[str] = None,
+        page: int = 1,
+        page_size: int = 20,
+        search: Optional[str] = None
+    ) -> Tuple[List[Dict], int]:
+        """获取提示词列表（支持分页和筛选）"""
+        prompts_file = DATA_DIR / "prompts.json"
+        all_prompts = DataLoader._load_json_file(prompts_file)
+        
+        # 筛选分类
+        if category:
+            all_prompts = [p for p in all_prompts if p.get("category") == category]
+        
+        # 搜索
+        if search:
+            search_lower = search.lower()
+            all_prompts = [
+                p for p in all_prompts
+                if search_lower in p.get("name", "").lower()
+                or search_lower in p.get("description", "").lower()
+                or search_lower in p.get("content", "").lower()
+            ]
+        
+        total = len(all_prompts)
+        
+        # 分页
+        start = (page - 1) * page_size
+        end = start + page_size
+        prompts = all_prompts[start:end]
+        
+        return prompts, total
+    
+    @staticmethod
+    def get_rules(
+        category: Optional[str] = None,
+        page: int = 1,
+        page_size: int = 20,
+        search: Optional[str] = None
+    ) -> Tuple[List[Dict], int]:
+        """获取规则列表（支持分页和筛选）"""
+        rules_file = DATA_DIR / "rules.json"
+        all_rules = DataLoader._load_json_file(rules_file)
+        
+        # 筛选分类
+        if category:
+            all_rules = [r for r in all_rules if r.get("category") == category]
+        
+        # 搜索
+        if search:
+            search_lower = search.lower()
+            all_rules = [
+                r for r in all_rules
+                if search_lower in r.get("name", "").lower()
+                or search_lower in r.get("description", "").lower()
+                or search_lower in r.get("content", "").lower()
+            ]
+        
+        total = len(all_rules)
+        
+        # 分页
+        start = (page - 1) * page_size
+        end = start + page_size
+        rules = all_rules[start:end]
+        
+        return rules, total
+    
+    @staticmethod
+    def get_resources(
+        type: Optional[str] = None,
+        category: Optional[str] = None,
+        page: int = 1,
+        page_size: int = 20,
+        search: Optional[str] = None
+    ) -> Tuple[List[Dict], int]:
+        """获取社区资源列表（支持分页和筛选）"""
+        resources_file = DATA_DIR / "resources.json"
+        all_resources = DataLoader._load_json_file(resources_file)
+        
+        # 筛选类型
+        if type:
+            all_resources = [r for r in all_resources if r.get("type") == type]
+        
+        # 筛选分类
+        if category:
+            all_resources = [r for r in all_resources if r.get("category") == category]
+        
+        # 搜索
+        if search:
+            search_lower = search.lower()
+            all_resources = [
+                r for r in all_resources
+                if search_lower in r.get("title", "").lower()
+                or search_lower in r.get("description", "").lower()
+            ]
+        
+        # 按创建时间倒序排序
+        all_resources.sort(key=lambda x: x.get("created_at", ""), reverse=True)
+        
+        total = len(all_resources)
+        
+        # 分页
+        start = (page - 1) * page_size
+        end = start + page_size
+        resources = all_resources[start:end]
+        
+        return resources, total

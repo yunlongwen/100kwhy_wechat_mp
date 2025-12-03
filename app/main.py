@@ -650,6 +650,9 @@ def create_app() -> FastAPI:
     @app.get("/submit", response_class=HTMLResponse)
     @app.get("/submit-tool", response_class=HTMLResponse)
     @app.get("/wechat-mp", response_class=HTMLResponse)
+    @app.get("/prompts", response_class=HTMLResponse)
+    @app.get("/rules", response_class=HTMLResponse)
+    @app.get("/resources", response_class=HTMLResponse)
     @app.get("/category/{category}", response_class=HTMLResponse)
     @app.get("/tool/{tool_id_or_identifier}", response_class=HTMLResponse)
     async def root(category: str = None, tool_id_or_identifier: str = None):
@@ -1140,14 +1143,14 @@ def create_app() -> FastAPI:
                     <a href="/ai-news" class="top-nav-item px-5 py-3 text-base tech-font-nav text-gray-300 hover:text-neon-purple rounded-lg transition-all whitespace-nowrap">
                   🤖 AI资讯
                 </a>
-                    <a href="/hot-news" class="top-nav-item px-5 py-3 text-base tech-font-nav text-gray-300 hover:text-neon-cyan rounded-lg transition-all whitespace-nowrap">
-                      🔥 热门资讯
+                    <a href="/prompts" class="top-nav-item px-5 py-3 text-base tech-font-nav text-gray-300 hover:text-neon-cyan rounded-lg transition-all whitespace-nowrap">
+                      💡 提示词
                 </a>
-                    <a href="/recent" class="top-nav-item px-5 py-3 text-base tech-font-nav text-gray-300 hover:text-neon-cyan rounded-lg transition-all whitespace-nowrap">
-                      ⏰ 最新资讯
+                    <a href="/rules" class="top-nav-item px-5 py-3 text-base tech-font-nav text-gray-300 hover:text-neon-cyan rounded-lg transition-all whitespace-nowrap">
+                      📋 规则
                 </a>
-                    <a href="/submit" class="top-nav-item px-5 py-3 text-base tech-font-nav text-gray-300 hover:text-neon-purple rounded-lg transition-all whitespace-nowrap">
-                      ✍️ 提交资讯
+                    <a href="/resources" class="top-nav-item px-5 py-3 text-base tech-font-nav text-gray-300 hover:text-neon-purple rounded-lg transition-all whitespace-nowrap">
+                      🌐 社区资源
                 </a>
                     <a href="/wechat-mp" class="top-nav-item px-5 py-3 text-base tech-font-nav text-gray-300 hover:text-neon-cyan rounded-lg transition-all whitespace-nowrap">
                       📱 微信公众号
@@ -1172,9 +1175,9 @@ def create_app() -> FastAPI:
             <div class="mobile-top-nav-menu" id="mobile-top-nav-menu">
               <a href="/news" class="mobile-nav-link">📰 编程资讯</a>
               <a href="/ai-news" class="mobile-nav-link">🤖 AI资讯</a>
-              <a href="/hot-news" class="mobile-nav-link">🔥 热门资讯</a>
-              <a href="/recent" class="mobile-nav-link">⏰ 最新资讯</a>
-              <a href="/submit" class="mobile-nav-link">✍️ 提交资讯</a>
+              <a href="/prompts" class="mobile-nav-link">💡 提示词</a>
+              <a href="/rules" class="mobile-nav-link">📋 规则</a>
+              <a href="/resources" class="mobile-nav-link">🌐 社区资源</a>
               <a href="/wechat-mp" class="mobile-nav-link">📱 微信公众号</a>
               <a href="/digest/panel" id="mobile-admin-entry" class="mobile-nav-link hidden" style="display: none;">🔐 管理员入口</a>
             </div>
@@ -1851,6 +1854,52 @@ def create_app() -> FastAPI:
                 console.log('显示更多文章:', toolIdOrIdentifier);
               }
               
+              // 顶部导航激活状态管理函数（必须在 handleRoute 之前定义）
+              function updateActiveNav() {
+                // 每次调用时都读取最新的路径
+                const currentPath = window.location.pathname || '/news';
+                const topNavItems = document.querySelectorAll('.top-nav-item');
+                
+                if (!topNavItems || topNavItems.length === 0) {
+                  // DOM 还没加载完成，稍后重试
+                  setTimeout(updateActiveNav, 100);
+                  return;
+                }
+                
+                // 路由映射：将当前路径映射到对应的导航项
+                const routeMap = {
+                  '/': '/news',
+                  '/news': '/news',
+                  '/ai-news': '/ai-news',
+                  '/tools': '/tools',
+                  '/prompts': '/prompts',
+                  '/rules': '/rules',
+                  '/resources': '/resources',
+                  '/wechat-mp': '/wechat-mp'
+                };
+                
+                // 处理动态路由
+                let targetRoute = currentPath;
+                if (currentPath.startsWith('/category/') || currentPath.startsWith('/tool/')) {
+                  targetRoute = '/tools';
+                } else if (routeMap[currentPath]) {
+                  targetRoute = routeMap[currentPath];
+                } else if (currentPath === '/') {
+                  targetRoute = '/news';
+                }
+                
+                topNavItems.forEach(item => {
+                  const href = item.getAttribute('href');
+                  // 先移除所有 active 类
+                  item.classList.remove('active');
+                  
+                  // 检查是否应该激活
+                  if (href === targetRoute || href === currentPath) {
+                    item.classList.add('active');
+                  }
+                });
+              }
+              
               // 页面路由
               function handleRoute() {
                 const path = window.location.pathname || '/news';
@@ -1859,6 +1908,9 @@ def create_app() -> FastAPI:
                 // 移除开头的斜杠并转换为路由标识
                 const route = path.startsWith('/') ? path.substring(1) : path;
                 currentPage.type = route;
+                
+                // 更新导航激活状态
+                setTimeout(updateActiveNav, 50);
                 
                 if (route === 'news' || route === '') {
                   currentPage.category = null;
@@ -1869,12 +1921,15 @@ def create_app() -> FastAPI:
                 } else if (route === 'tools') {
                   currentPage.category = null;
                   loadTools(true, null, 1);
-                } else if (route === 'hot-news') {
+                } else if (route === 'prompts') {
                   currentPage.category = null;
-                  loadHotNews(1);
-                } else if (route === 'recent') {
+                  loadPrompts(1);
+                } else if (route === 'rules') {
                   currentPage.category = null;
-                  loadRecent(1);
+                  loadRules(1);
+                } else if (route === 'resources') {
+                  currentPage.category = null;
+                  loadResources(1);
                 } else if (route === 'submit') {
                   currentPage.category = null;
                   showSubmitForm();
@@ -1899,9 +1954,14 @@ def create_app() -> FastAPI:
                     loadTools(true, null, 1);
                   }
                 } else {
-                  // 默认显示热门工具
+                  // 默认显示编程资讯
                   currentPage.category = null;
-                  loadTools(true, null, 1);
+                  loadArticles('programming', 1);
+                }
+                
+                // 再次更新导航状态（确保在内容加载后）
+                if (typeof updateActiveNav === 'function') {
+                  setTimeout(updateActiveNav, 200);
                 }
               }
               
@@ -2176,6 +2236,316 @@ def create_app() -> FastAPI:
                 } catch (error) {
                   console.error('记录工具点击失败:', error);
                 }
+              }
+              
+              // 复制提示词到剪贴板
+              async function copyPromptToClipboard(button, promptId) {
+                try {
+                  // 从 data 属性获取编码的内容
+                  const encodedContent = button.getAttribute('data-content');
+                  if (!encodedContent) {
+                    console.error('未找到内容');
+                    return;
+                  }
+                  
+                  // 解码 base64 内容
+                  const textContent = decodeURIComponent(escape(atob(encodedContent)));
+                  
+                  if (navigator.clipboard && navigator.clipboard.writeText) {
+                    await navigator.clipboard.writeText(textContent);
+                  } else {
+                    // 降级方案：使用 execCommand
+                    const textArea = document.createElement('textarea');
+                    textArea.value = textContent;
+                    textArea.style.position = 'fixed';
+                    textArea.style.opacity = '0';
+                    document.body.appendChild(textArea);
+                    textArea.select();
+                    document.execCommand('copy');
+                    document.body.removeChild(textArea);
+                  }
+                  
+                  // 显示成功提示
+                  const originalText = button.innerHTML;
+                  button.innerHTML = '✓ 已复制';
+                  button.classList.add('bg-green-600');
+                  button.classList.remove('bg-neon-cyan');
+                  setTimeout(() => {
+                    button.innerHTML = originalText;
+                    button.classList.remove('bg-green-600');
+                    button.classList.add('bg-neon-cyan');
+                  }, 2000);
+                } catch (error) {
+                  console.error('复制失败:', error);
+                  alert('复制失败，请手动选择文本复制');
+                }
+              }
+              
+              // 加载提示词
+              async function loadPrompts(page = 1) {
+                const mainContent = document.getElementById('main-content');
+                if (!mainContent) return;
+                
+                mainContent.innerHTML = '<div class="text-center py-20"><div class="inline-block animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-neon-cyan"></div></div>';
+                
+                try {
+                  const response = await fetch(`${API_BASE}/prompts?page=${page}&page_size=${currentPage.pageSize}`);
+                  const data = await response.json();
+                  
+                  const config = getPageConfig('prompts');
+                  const title = config.title || '提示词';
+                  const description = config.description || '精选AI编程提示词，提升开发效率';
+                  
+                  let html = `
+                    <div class="mb-6">
+                      <h1 class="text-4xl tech-font-bold text-neon-cyan text-glow mb-2">${title}</h1>
+                      <p class="text-base text-gray-400 tech-font">${description} (共 ${data.total} 个)</p>
+                    </div>
+                    <div class="space-y-6 mb-8">
+                  `;
+                  
+                  if (data.items.length === 0) {
+                    html += '<div class="text-center py-20 text-gray-400">暂无提示词</div>';
+                  } else {
+                    data.items.forEach((prompt, index) => {
+                      const promptId = prompt.id || index;
+                      // 转义HTML，防止XSS，并处理换行
+                      const content = prompt.content || '';
+                      // 先处理换行，再转义HTML
+                      const contentWithBreaks = content.split('\\n').join('<br>');
+                      const escapedContent = contentWithBreaks.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+                      // 将换行标签也转义，因为我们要在pre标签中显示
+                      const formattedContent = escapedContent.replace(/<br>/g, '<br>');
+                      // 将内容编码为 base64，安全地存储在 data 属性中
+                      const encodedContent = btoa(unescape(encodeURIComponent(content)));
+                      
+                      html += `
+                        <article class="glass rounded-xl border border-dark-border p-6 card-hover relative">
+                          <div class="flex items-start justify-between mb-4">
+                            <div class="flex-1">
+                              <h3 class="text-xl font-semibold text-gray-100 mb-2">${prompt.name}</h3>
+                              <p class="text-sm text-gray-400 mb-3">${prompt.description}</p>
+                            </div>
+                            ${prompt.content ? `
+                            <button id="copy-btn-${promptId}" 
+                                    data-content="${encodedContent}"
+                                    onclick="copyPromptToClipboard(this, ${promptId})" 
+                                    class="ml-4 px-4 py-2 bg-neon-cyan hover:bg-neon-blue text-dark-bg rounded-lg font-medium transition-all hover-glow flex items-center gap-2 whitespace-nowrap">
+                              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                              </svg>
+                              一键复制
+                            </button>
+                            ` : ''}
+                          </div>
+                          ${prompt.content ? `
+                          <div class="relative">
+                            <div class="glass p-5 rounded-lg border border-neon-cyan/20 bg-dark-bg/50 mb-4">
+                              <pre class="text-sm text-gray-200 whitespace-pre-wrap font-mono leading-relaxed overflow-x-auto" style="max-height: 600px; overflow-y: auto;">${formattedContent}</pre>
+                            </div>
+                          </div>
+                          ` : ''}
+                          <div class="flex items-center justify-between mt-4 pt-4 border-t border-dark-border">
+                            <div class="flex items-center gap-2 flex-wrap">
+                              ${(prompt.tags || []).map(tag => `<span class="px-2 py-1 glass text-neon-cyan text-xs rounded border border-neon-cyan/30">${tag}</span>`).join('')}
+                            </div>
+                            ${prompt.url ? `<a href="${prompt.url}" target="_blank" class="text-xs text-gray-400 hover:text-neon-cyan transition-colors">查看原文 →</a>` : ''}
+                          </div>
+                        </article>
+                      `;
+                    });
+                  }
+                  
+                  html += '</div>';
+                  
+                  if (data.total_pages > 1) {
+                    html += `
+                      <div class="flex items-center justify-center gap-2 mt-8">
+                        <button onclick="changePromptsPage(${data.page - 1})" ${data.page <= 1 ? 'disabled' : ''} class="px-4 py-2 glass text-gray-300 rounded-lg hover:bg-dark-card hover:text-neon-cyan transition-all border border-dark-border disabled:opacity-50 disabled:cursor-not-allowed">上一页</button>
+                        <span class="px-4 py-2 text-gray-400 tech-font">第 ${data.page} / ${data.total_pages} 页</span>
+                        <button onclick="changePromptsPage(${data.page + 1})" ${data.page >= data.total_pages ? 'disabled' : ''} class="px-4 py-2 glass text-gray-300 rounded-lg hover:bg-dark-card hover:text-neon-cyan transition-all border border-dark-border disabled:opacity-50 disabled:cursor-not-allowed">下一页</button>
+                      </div>
+                    `;
+                  }
+                  
+                  mainContent.innerHTML = html;
+                  // 更新导航激活状态
+                  setTimeout(updateActiveNav, 100);
+                } catch (error) {
+                  console.error('加载提示词失败:', error);
+                  mainContent.innerHTML = '<div class="text-center py-20 text-red-400">加载失败</div>';
+                }
+              }
+              
+              function changePromptsPage(page) {
+                if (page < 1) return;
+                loadPrompts(page);
+              }
+              
+              // 加载规则
+              async function loadRules(page = 1) {
+                const mainContent = document.getElementById('main-content');
+                if (!mainContent) return;
+                
+                mainContent.innerHTML = '<div class="text-center py-20"><div class="inline-block animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-neon-cyan"></div></div>';
+                
+                try {
+                  // 规则页面一次性加载所有规则，不使用分页
+                  const response = await fetch(`${API_BASE}/rules?page=1&page_size=100`);
+                  const data = await response.json();
+                  
+                  const config = getPageConfig('rules');
+                  const title = config.title || '规则';
+                  const description = config.description || 'Cursor Rules和其他AI编程规则';
+                  
+                  let html = `
+                    <div class="mb-6">
+                      <h1 class="text-4xl tech-font-bold text-neon-cyan text-glow mb-2">${title}</h1>
+                      <p class="text-base text-gray-400 tech-font">${description} (共 ${data.total} 个)</p>
+                    </div>
+                    <div class="space-y-4 mb-8">
+                  `;
+                  
+                  if (data.items.length === 0) {
+                    html += '<div class="text-center py-20 text-gray-400">暂无规则</div>';
+                  } else {
+                    data.items.forEach(rule => {
+                      html += `
+                        <article class="glass rounded-xl border border-dark-border p-6 card-hover">
+                          <h3 class="text-xl font-semibold text-gray-100 mb-2">${rule.name}</h3>
+                          <p class="text-sm text-gray-300 mb-3">${rule.description}</p>
+                          ${rule.content ? `<div class="glass p-4 rounded-lg mb-3"><pre class="text-xs text-gray-300 whitespace-pre-wrap">${rule.content.substring(0, 500)}${rule.content.length > 500 ? '...' : ''}</pre></div>` : ''}
+                          ${rule.url ? `<a href="${rule.url}" target="_blank" class="text-neon-cyan hover:text-neon-blue text-sm">查看详情 →</a>` : ''}
+                          <div class="flex items-center gap-2 flex-wrap mt-3">
+                            ${(rule.tags || []).map(tag => `<span class="px-2 py-1 glass text-neon-cyan text-xs rounded border border-neon-cyan/30">${tag}</span>`).join('')}
+                          </div>
+                        </article>
+                      `;
+                    });
+                  }
+                  
+                  html += '</div>';
+                  
+                  if (data.total_pages > 1) {
+                    html += `
+                      <div class="flex items-center justify-center gap-2 mt-8">
+                        <button onclick="changeRulesPage(${data.page - 1})" ${data.page <= 1 ? 'disabled' : ''} class="px-4 py-2 glass text-gray-300 rounded-lg hover:bg-dark-card hover:text-neon-cyan transition-all border border-dark-border disabled:opacity-50 disabled:cursor-not-allowed">上一页</button>
+                        <span class="px-4 py-2 text-gray-400 tech-font">第 ${data.page} / ${data.total_pages} 页</span>
+                        <button onclick="changeRulesPage(${data.page + 1})" ${data.page >= data.total_pages ? 'disabled' : ''} class="px-4 py-2 glass text-gray-300 rounded-lg hover:bg-dark-card hover:text-neon-cyan transition-all border border-dark-border disabled:opacity-50 disabled:cursor-not-allowed">下一页</button>
+                      </div>
+                    `;
+                  }
+                  
+                  mainContent.innerHTML = html;
+                  // 更新导航激活状态
+                  setTimeout(updateActiveNav, 100);
+                } catch (error) {
+                  console.error('加载规则失败:', error);
+                  mainContent.innerHTML = '<div class="text-center py-20 text-red-400">加载失败</div>';
+                }
+              }
+              
+              function changeRulesPage(page) {
+                if (page < 1) return;
+                loadRules(page);
+              }
+              
+              // 加载社区资源（按分类模块化显示）
+              async function loadResources(page = 1) {
+                const mainContent = document.getElementById('main-content');
+                if (!mainContent) return;
+                
+                mainContent.innerHTML = '<div class="text-center py-20"><div class="inline-block animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-neon-cyan"></div></div>';
+                
+                try {
+                  // 获取所有资源，使用最大page_size
+                  const response = await fetch(`${API_BASE}/resources?page=1&page_size=100`);
+                  const data = await response.json();
+                  
+                  const config = getPageConfig('resources');
+                  const title = config.title || '社区资源';
+                  const description = config.description || 'AI编程教程、文章和社区资源';
+                  
+                  // 按分类分组
+                  const resourcesByCategory = {};
+                  data.items.forEach(resource => {
+                    const category = resource.category || '其他';
+                    if (!resourcesByCategory[category]) {
+                      resourcesByCategory[category] = [];
+                    }
+                    resourcesByCategory[category].push(resource);
+                  });
+                  
+                  let html = `
+                    <div class="mb-6">
+                      <h1 class="text-4xl tech-font-bold text-neon-cyan text-glow mb-2">${title}</h1>
+                      <p class="text-base text-gray-400 tech-font">${description} (共 ${data.total} 个)</p>
+                    </div>
+                  `;
+                  
+                  if (data.items.length === 0) {
+                    html += '<div class="text-center py-20 text-gray-400">暂无资源</div>';
+                  } else {
+                    // 按分类显示
+                    const categoryOrder = ['飞书知识库', '技术社区', '其他'];
+                    const sortedCategories = Object.keys(resourcesByCategory).sort((a, b) => {
+                      const indexA = categoryOrder.indexOf(a);
+                      const indexB = categoryOrder.indexOf(b);
+                      if (indexA === -1 && indexB === -1) return a.localeCompare(b);
+                      if (indexA === -1) return 1;
+                      if (indexB === -1) return -1;
+                      return indexA - indexB;
+                    });
+                    
+                    sortedCategories.forEach(category => {
+                      const resources = resourcesByCategory[category];
+                      const categoryIcon = category === '飞书知识库' ? '📚' : category === '技术社区' ? '🌐' : '📦';
+                      
+                      html += `
+                        <div class="mb-8">
+                          <h2 class="text-2xl font-bold text-neon-cyan mb-4 flex items-center gap-2">
+                            ${categoryIcon} ${category}
+                          </h2>
+                          <div class="space-y-4">
+                      `;
+                      
+                      resources.forEach(resource => {
+                        html += `
+                          <article class="glass rounded-xl border border-dark-border p-6 card-hover">
+                            <div class="flex items-start gap-3 mb-2">
+                              <span class="text-sm px-2 py-1 glass border border-neon-purple/30 text-neon-purple rounded">${resource.type || '资源'}</span>
+                            </div>
+                            <h3 class="text-xl font-semibold text-gray-100 mb-2">
+                              <a href="${resource.url}" target="_blank" class="hover:text-neon-cyan transition-colors">${resource.title}</a>
+                            </h3>
+                            <p class="text-sm text-gray-300 mb-3">${resource.description}</p>
+                            ${resource.author ? `<p class="text-xs text-gray-400 mb-3">作者: ${resource.author}</p>` : ''}
+                            <div class="flex items-center gap-2 flex-wrap">
+                              ${(resource.tags || []).map(tag => `<span class="px-2 py-1 glass text-neon-cyan text-xs rounded border border-neon-cyan/30">${tag}</span>`).join('')}
+                            </div>
+                          </article>
+                        `;
+                      });
+                      
+                      html += `
+                          </div>
+                        </div>
+                      `;
+                    });
+                  }
+                  
+                  mainContent.innerHTML = html;
+                  // 更新导航激活状态
+                  setTimeout(updateActiveNav, 100);
+                } catch (error) {
+                  console.error('加载社区资源失败:', error);
+                  mainContent.innerHTML = '<div class="text-center py-20 text-red-400">加载失败</div>';
+                }
+              }
+              
+              function changeResourcesPage(page) {
+                if (page < 1) return;
+                loadResources(page);
               }
               
               // 显示提交资讯表单
@@ -2746,30 +3116,17 @@ def create_app() -> FastAPI:
                   }
                 }
                 
-                // 顶部导航激活状态管理
-                const topNavItems = document.querySelectorAll('.top-nav-item');
-                const currentPath = window.location.pathname || '/news';
-                
-                function updateActiveNav() {
-                  topNavItems.forEach(item => {
-                    const href = item.getAttribute('href');
-                    if (href === currentPath || (currentPath === '/' && href === '/news')) {
-                      item.classList.add('active');
-                    } else {
-                      item.classList.remove('active');
-                    }
-                  });
-                }
-                
+                // 初始化导航激活状态
                 updateActiveNav();
                 
                 // 监听popstate事件（浏览器前进/后退）
                 window.addEventListener('popstate', function() {
                   handleRoute();
-                  updateActiveNav();
+                  setTimeout(updateActiveNav, 100);
                 });
                 
                 // 点击导航项
+                const topNavItems = document.querySelectorAll('.top-nav-item');
                 topNavItems.forEach(item => {
                   item.addEventListener('click', function(e) {
                     const href = this.getAttribute('href');
@@ -2781,7 +3138,7 @@ def create_app() -> FastAPI:
                     // 使用 history API 更新 URL
                     window.history.pushState({}, '', href);
                     handleRoute();
-                    updateActiveNav();
+                    setTimeout(updateActiveNav, 100);
                   });
                 });
                 
@@ -2826,8 +3183,8 @@ def create_app() -> FastAPI:
           <script>
             // 反馈/联系按钮功能
             document.getElementById('feedback-btn')?.addEventListener('click', function() {
-              // 跳转到提交资讯页面
-              window.location.href = '/submit';
+              // 跳转到社区资源页面
+              window.location.href = '/resources';
             });
             
             // 回到顶部按钮功能
