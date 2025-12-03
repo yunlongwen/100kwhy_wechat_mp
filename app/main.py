@@ -2280,7 +2280,84 @@ def create_app() -> FastAPI:
                   alert('复制失败，请手动选择文本复制');
                 }
               }
-              
+
+              // 复制提示词内容
+              async function loadAndCopyPrompt(button, promptId) {
+                try {
+                  const identifier = button.getAttribute('data-identifier');
+                  if (!identifier) {
+                    console.error('未找到identifier');
+                    return;
+                  }
+
+                  // 获取内容
+                  const contentElement = document.getElementById(`content-${promptId}`);
+                  if (!contentElement) {
+                    console.error('未找到内容元素');
+                    return;
+                  }
+
+                  const content = contentElement.textContent;
+                  if (!content || content === '正在加载内容...' || content === '加载内容失败') {
+                    alert('内容尚未加载完成，请稍后再试');
+                    return;
+                  }
+
+                  // 复制到剪贴板
+                  if (navigator.clipboard && navigator.clipboard.writeText) {
+                    await navigator.clipboard.writeText(content);
+                  } else {
+                    // 降级方案
+                    const textArea = document.createElement('textarea');
+                    textArea.value = content;
+                    textArea.style.position = 'fixed';
+                    textArea.style.opacity = '0';
+                    document.body.appendChild(textArea);
+                    textArea.select();
+                    document.execCommand('copy');
+                    document.body.removeChild(textArea);
+                  }
+
+                  // 显示成功提示
+                  const originalText = button.innerHTML;
+                  button.innerHTML = '✓ 已复制';
+                  button.classList.add('bg-green-600');
+                  button.classList.remove('bg-neon-cyan');
+                  setTimeout(() => {
+                    button.innerHTML = originalText;
+                    button.classList.remove('bg-green-600');
+                    button.classList.add('bg-neon-cyan');
+                  }, 2000);
+
+                } catch (error) {
+                  console.error('复制失败:', error);
+                  alert('复制失败，请稍后重试');
+                }
+              }
+
+              // 加载提示词内容
+              async function loadPromptContent(identifier, promptId) {
+                try {
+                  const contentElement = document.getElementById(`content-${promptId}`);
+                  if (!contentElement) return;
+
+                  const response = await fetch(`/api/prompts/${identifier}`);
+                  if (!response.ok) {
+                    contentElement.textContent = '加载内容失败';
+                    return;
+                  }
+
+                  const data = await response.json();
+                  contentElement.textContent = data.content;
+                } catch (error) {
+                  console.error('加载提示词内容失败:', error);
+                  const contentElement = document.getElementById(`content-${promptId}`);
+                  if (contentElement) {
+                    contentElement.textContent = '加载内容失败';
+                  }
+                }
+              }
+
               // 加载提示词
               async function loadPrompts(page = 1) {
                 const mainContent = document.getElementById('main-content');
@@ -2309,16 +2386,9 @@ def create_app() -> FastAPI:
                   } else {
                     data.items.forEach((prompt, index) => {
                       const promptId = prompt.id || index;
-                      // 转义HTML，防止XSS，并处理换行
-                      const content = prompt.content || '';
-                      // 先处理换行，再转义HTML
-                      const contentWithBreaks = content.split('\\n').join('<br>');
-                      const escapedContent = contentWithBreaks.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
-                      // 将换行标签也转义，因为我们要在pre标签中显示
-                      const formattedContent = escapedContent.replace(/<br>/g, '<br>');
-                      // 将内容编码为 base64，安全地存储在 data 属性中
-                      const encodedContent = btoa(unescape(encodeURIComponent(content)));
-                      
+                      const identifier = prompt.identifier || '';
+                      const hasContent = identifier; // 如果有identifier，就认为有内容
+
                       html += `
                         <article class="glass rounded-xl border border-dark-border p-6 card-hover relative">
                           <div class="flex items-start justify-between mb-4">
@@ -2326,10 +2396,10 @@ def create_app() -> FastAPI:
                               <h3 class="text-xl font-semibold text-gray-100 mb-2">${prompt.name}</h3>
                               <p class="text-sm text-gray-400 mb-3">${prompt.description}</p>
                             </div>
-                            ${prompt.content ? `
-                            <button id="copy-btn-${promptId}" 
-                                    data-content="${encodedContent}"
-                                    onclick="copyPromptToClipboard(this, ${promptId})" 
+                            ${hasContent ? `
+                            <button id="copy-btn-${promptId}"
+                                    data-identifier="${identifier}"
+                                    onclick="loadAndCopyPrompt(this, ${promptId})"
                                     class="ml-4 px-4 py-2 bg-neon-cyan hover:bg-neon-blue text-dark-bg rounded-lg font-medium transition-all hover-glow flex items-center gap-2 whitespace-nowrap">
                               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
@@ -2338,10 +2408,10 @@ def create_app() -> FastAPI:
                             </button>
                             ` : ''}
                           </div>
-                          ${prompt.content ? `
-                          <div class="relative">
+                          ${hasContent ? `
+                          <div id="content-container-${promptId}" class="content-container relative">
                             <div class="glass p-5 rounded-lg border border-neon-cyan/20 bg-dark-bg/50 mb-4">
-                              <pre class="text-sm text-gray-200 whitespace-pre-wrap font-mono leading-relaxed overflow-x-auto" style="max-height: 600px; overflow-y: auto;">${formattedContent}</pre>
+                              <pre id="content-${promptId}" class="text-sm text-gray-200 whitespace-pre-wrap font-mono leading-relaxed overflow-x-auto" style="max-height: 600px; overflow-y: auto;">正在加载内容...</pre>
                             </div>
                           </div>
                           ` : ''}
@@ -2367,8 +2437,18 @@ def create_app() -> FastAPI:
                       </div>
                     `;
                   }
-                  
+
                   mainContent.innerHTML = html;
+
+                  // 加载每个提示词的内容
+                  data.items.forEach((prompt, index) => {
+                    const promptId = prompt.id || index;
+                    const identifier = prompt.identifier;
+                    if (identifier) {
+                      loadPromptContent(identifier, promptId);
+                    }
+                  });
+
                   // 更新导航激活状态
                   setTimeout(updateActiveNav, 100);
                 } catch (error) {

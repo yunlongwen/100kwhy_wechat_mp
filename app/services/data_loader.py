@@ -850,7 +850,7 @@ class DataLoader:
         search: Optional[str] = None
     ) -> Tuple[List[Dict], int]:
         """获取提示词列表（支持分页和筛选）"""
-        prompts_file = DATA_DIR / "prompts.json"
+        prompts_file = DATA_DIR / "prompts" / "prompts.json"
         all_prompts = DataLoader._load_json_file(prompts_file)
         
         # 筛选分类
@@ -864,7 +864,6 @@ class DataLoader:
                 p for p in all_prompts
                 if search_lower in p.get("name", "").lower()
                 or search_lower in p.get("description", "").lower()
-                or search_lower in p.get("content", "").lower()
             ]
         
         total = len(all_prompts)
@@ -875,7 +874,20 @@ class DataLoader:
         prompts = all_prompts[start:end]
         
         return prompts, total
-    
+
+    @staticmethod
+    def get_prompt_content(identifier: str) -> Optional[str]:
+        """根据identifier获取提示词内容"""
+        try:
+            # 构建md文件路径 (p-{identifier}.md)
+            md_file = DATA_DIR / "prompts" / f"p-{identifier}.md"
+            if md_file.exists():
+                return md_file.read_text(encoding="utf-8")
+        except Exception as e:
+            print(f"Error loading prompt content for {identifier}: {e}")
+
+        return None
+
     @staticmethod
     def get_rules(
         category: Optional[str] = None,

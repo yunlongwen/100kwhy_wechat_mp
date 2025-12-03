@@ -194,7 +194,7 @@ async def _fetch_with_playwright(
         import traceback
         logger.debug(traceback.format_exc())
     
-    logger.info(f"从 DevMaster.cn 成功抓取到 {len(tools)} 个工具")
+    logger.info(f"成功抓取到 {len(tools)} 个工具")
     return tools
 
 

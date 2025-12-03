@@ -186,7 +186,7 @@ if __name__ == "__main__":
         sys.exit(1)
     
     text_file = Path(sys.argv[1])
-    prompts_json = Path(__file__).parent.parent / "data" / "prompts.json"
+    prompts_json = Path(__file__).parent.parent / "data" / "prompts" / "prompts.json"
     
     if not text_file.exists():
         print(f"错误: 文件 {text_file} 不存在")

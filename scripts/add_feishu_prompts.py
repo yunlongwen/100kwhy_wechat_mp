@@ -206,7 +206,7 @@ if __name__ == "__main__":
     
     text_file = Path(sys.argv[1])
     project_root = Path(__file__).parent.parent
-    prompts_json = project_root / "data" / "prompts.json"
+    prompts_json = project_root / "data" / "prompts" / "prompts.json"
     
     if not text_file.exists():
         print(f"错误: 文件不存在: {text_file}")

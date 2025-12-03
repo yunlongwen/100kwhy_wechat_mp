@@ -593,6 +593,21 @@ async def get_prompts(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.get("/prompts/{identifier}")
+async def get_prompt_content(identifier: str):
+    """获取指定提示词的内容"""
+    try:
+        content = DataLoader.get_prompt_content(identifier)
+        if content is None:
+            raise HTTPException(status_code=404, detail="提示词不存在")
+        return {"content": content}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"获取提示词内容失败: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.get("/rules", response_model=PaginatedResponse)
 async def get_rules(
     category: Optional[str] = Query(None, description="规则分类"),
