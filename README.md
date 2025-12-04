@@ -73,14 +73,22 @@
 
 ```text
 app/
-  main.py                # 应用入口 + 前端HTML
-  routes/
-    api.py              # 公开API接口
-    digest.py           # 管理员面板和API
-  services/
+  main.py                # 应用入口
+  domain/                # 领域层（业务模型）
+    digest/             # 摘要模型
+    sources/            # 数据源管理
+  infrastructure/        # 基础设施层
+    crawlers/           # 爬虫
+    notifiers/          # 通知服务
+    db/                 # 数据库
+  services/             # 服务层（业务服务）
     data_loader.py      # 数据加载和保存服务
-  sources/              # 文章池 / 候选池工具 & 爬虫
-  notifier/             # 推送服务
+    digest_service.py   # 推送服务
+    backup_service.py   # 备份服务
+  presentation/          # 表示层
+    routes/             # API路由
+    templates.py        # HTML模板
+    static/             # 静态资源
 config/
   crawler_keywords.json # 抓取关键词
 data/
@@ -88,18 +96,21 @@ data/
   articles/             # 正式文章池
     programming.json   # 编程资讯
     ai_news.json       # AI资讯
-  tools/                # 正式工具池## 📄 更新日志
+  tools/                # 正式工具池
     featured.json      # 热门工具
     {category}.json   # 各分类工具
   articles/ai_candidates.json    # 文章候选池
   articles/ai_articles.json      # 资讯推送列表
   tools/tool_candidates.json  # 工具候选池
 docs/
+  technical/            # 技术文档
+    ARCHITECTURE.md    # 架构设计文档
   deploy/               # 部署相关文档
   feature/              # 功能描述文档
-  ADR/                  # 技术决策文档
 requirements.txt        # 依赖清单
 ```
+
+> 📖 **架构说明**：项目采用 Clean 架构设计，详细说明请查看 [架构设计文档](docs/technical/ARCHITECTURE.md)
 
 ---
 
@@ -225,6 +236,9 @@ uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 ---
 
 ## 📚 文档
+
+**技术文档** (docs/technical/):
+- **[架构设计文档](docs/technical/ARCHITECTURE.md)** ⭐ - Clean架构重构说明，包含各层次职责和依赖关系
 
 **功能文档** (docs/feature/):
 - **[完整功能文档](docs/feature/features_complete.md)** ⭐ - 详细的功能说明和使用指南
