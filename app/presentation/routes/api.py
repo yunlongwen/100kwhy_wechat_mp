@@ -640,6 +640,7 @@ async def get_rules(
 async def get_resources(
     type: Optional[str] = Query(None, description="资源类型（教程/文章）"),
     category: Optional[str] = Query(None, description="资源分类"),
+    subcategory: Optional[str] = Query(None, description="资源子分类（仅用于Claude Code资源）"),
     page: int = Query(1, ge=1, description="页码"),
     page_size: int = Query(20, ge=1, le=100, description="每页数量"),
     search: Optional[str] = Query(None, description="搜索关键词")
@@ -649,6 +650,7 @@ async def get_resources(
         resources, total = DataLoader.get_resources(
             type=type,
             category=category,
+            subcategory=subcategory,
             page=page,
             page_size=page_size,
             search=search

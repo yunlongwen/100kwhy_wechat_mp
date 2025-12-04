@@ -929,6 +929,7 @@ class DataLoader:
     def get_resources(
         type: Optional[str] = None,
         category: Optional[str] = None,
+        subcategory: Optional[str] = None,
         page: int = 1,
         page_size: int = 20,
         search: Optional[str] = None
@@ -944,6 +945,10 @@ class DataLoader:
         # 筛选分类
         if category:
             all_resources = [r for r in all_resources if r.get("category") == category]
+        
+        # 筛选子分类（仅用于Claude Code资源）
+        if subcategory:
+            all_resources = [r for r in all_resources if r.get("subcategory") == subcategory]
         
         # 搜索
         if search:

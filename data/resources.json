@@ -4,7 +4,11 @@
     "description": "AGI之路飞书知识库中的AI编程相关内容专区，包含AI编程相关的知识和资源",
     "type": "知识库",
     "category": "飞书知识库",
-    "tags": ["AI编程", "飞书知识库", "AGI"],
+    "tags": [
+      "AI编程",
+      "飞书知识库",
+      "AGI"
+    ],
     "url": "https://waytoagi.feishu.cn/wiki/Pxj8wsMmOii7ZSkN0mYc8xdtnHb",
     "author": "100kwhy",
     "view_count": 0,
@@ -18,7 +22,11 @@
     "description": "黄叔AI编程蓝皮书 - 飞书知识库中的AI编程系列内容",
     "type": "知识库",
     "category": "飞书知识库",
-    "tags": ["AI编程", "飞书知识库", "教程"],
+    "tags": [
+      "AI编程",
+      "飞书知识库",
+      "教程"
+    ],
     "url": "https://waytoagi.feishu.cn/wiki/Hm7fwRlKpismBWkKlrWcH6kdnjh",
     "author": "100kwhy",
     "view_count": 0,
@@ -32,7 +40,11 @@
     "description": "LangGPT社区中的AI编程系列内容，包含AI编程相关的教程和资源",
     "type": "知识库",
     "category": "飞书知识库",
-    "tags": ["AI编程", "飞书知识库", "LangGPT"],
+    "tags": [
+      "AI编程",
+      "飞书知识库",
+      "LangGPT"
+    ],
     "url": "https://langgptai.feishu.cn/wiki/WOMhwOkPsiNacKkgz2ecu9Mmngc",
     "author": "100kwhy",
     "view_count": 0,
@@ -46,7 +58,12 @@
     "description": "AIGC创意猎人飞书知识库中的AI编程专区，包含AI创意编程相关内容",
     "type": "知识库",
     "category": "飞书知识库",
-    "tags": ["AI编程", "飞书知识库", "AIGC", "创意"],
+    "tags": [
+      "AI编程",
+      "飞书知识库",
+      "AIGC",
+      "创意"
+    ],
     "url": "https://aigcreative.feishu.cn/wiki/Te0gwmI9GitLBmk1NCRcoUdHnmU",
     "author": "100kwhy",
     "view_count": 0,
@@ -60,7 +77,12 @@
     "description": "玩转AI实验室飞书知识库中的AI编程专区，包含AI编程实验和实践内容",
     "type": "知识库",
     "category": "飞书知识库",
-    "tags": ["AI编程", "飞书知识库", "实验室", "实践"],
+    "tags": [
+      "AI编程",
+      "飞书知识库",
+      "实验室",
+      "实践"
+    ],
     "url": "https://yunyinghui.feishu.cn/wiki/P2uBwuYkOiqAivk8qyEck3UVnSd",
     "author": "100kwhy",
     "view_count": 0,
@@ -74,7 +96,11 @@
     "description": "掘金技术社区中的AI编程相关内容，包含AI编程文章、教程和最佳实践",
     "type": "社区",
     "category": "技术社区",
-    "tags": ["AI编程", "技术社区", "掘金"],
+    "tags": [
+      "AI编程",
+      "技术社区",
+      "掘金"
+    ],
     "url": "https://juejin.cn/tag/AI%E7%BC%96%E7%A8%8B",
     "author": "掘金",
     "view_count": 0,
@@ -88,7 +114,11 @@
     "description": "CSDN技术社区中的AI编程相关内容，包含AI编程技术文章和资源",
     "type": "社区",
     "category": "技术社区",
-    "tags": ["AI编程", "技术社区", "CSDN"],
+    "tags": [
+      "AI编程",
+      "技术社区",
+      "CSDN"
+    ],
     "url": "https://blog.csdn.net/nav/python",
     "author": "CSDN",
     "view_count": 0,
@@ -102,7 +132,12 @@
     "description": "Cursor综合生态社区平台，核心功能涵盖规则分享、MCP工具推荐、行业资讯、招聘信息等多个维度。用户可浏览并生成适配不同技术栈的Cursor规则，探索热门MCP工具的使用方法。",
     "type": "社区",
     "category": "Cursor资源",
-    "tags": ["Cursor", "AI编程", "社区平台", "MCP工具"],
+    "tags": [
+      "Cursor",
+      "AI编程",
+      "社区平台",
+      "MCP工具"
+    ],
     "url": "https://cursor.directory/",
     "author": "Cursor",
     "view_count": 0,
@@ -116,7 +151,12 @@
     "description": "Cursor官方社区论坛，为用户提供交流互动、问题反馈与功能建议的平台。包含工具使用教程、版本更新说明和技术讨论。",
     "type": "社区",
     "category": "Cursor资源",
-    "tags": ["Cursor", "论坛", "官方社区", "技术支持"],
+    "tags": [
+      "Cursor",
+      "论坛",
+      "官方社区",
+      "技术支持"
+    ],
     "url": "https://forum.cursor.com/",
     "author": "Cursor",
     "view_count": 0,
@@ -130,7 +170,12 @@
     "description": "专注于Cursor AI编辑器的免费学习平台，提供全面的入门教程与实用技巧，帮助用户快速掌握Cursor工具的使用方法。",
     "type": "教程",
     "category": "Cursor资源",
-    "tags": ["Cursor", "教程", "学习平台", "AI编辑器"],
+    "tags": [
+      "Cursor",
+      "教程",
+      "学习平台",
+      "AI编辑器"
+    ],
     "url": "https://cursor101.com/zh",
     "author": "cursor101",
     "view_count": 0,
@@ -138,6 +183,328 @@
     "is_featured": true,
     "id": 10,
     "identifier": "cursor101"
+  },
+  {
+    "title": "aitmpl",
+    "description": "aitmpl - 这是一个为 Claude Code 项目提供即用型配置的平台，包括 AI Agent、Skills、命令、Hooks 和 MCPs 等组件，旨在帮助开发者快速构建和优化 AI 驱动的开发流程。它提供了",
+    "type": "资源",
+    "category": "Claude Code 资源",
+    "tags": [
+      "Claude Code",
+      "AI编程",
+      "工具"
+    ],
+    "url": "https://www.aitmpl.com/",
+    "author": "devmaster.cn",
+    "view_count": 0,
+    "created_at": "2025-12-04T12:27:36Z",
+    "is_featured": false,
+    "id": 11,
+    "identifier": "aitmpl",
+    "subcategory": "Skill"
+  },
+  {
+    "title": "claudemarketplaces",
+    "description": "claudemarketplaces - 这是一个全面的 Claude Code 插件市场目录，收录了数百个社区和官方的插件市场，涵盖了开发、安全、工作流、生产力等多个领域。用户可以在此发现和安装各种 Agent、命令、Skills 和工具，",
+    "type": "资源",
+    "category": "Claude Code 资源",
+    "tags": [
+      "Claude Code",
+      "AI编程",
+      "工具"
+    ],
+    "url": "https://claudemarketplaces.com",
+    "author": "devmaster.cn",
+    "view_count": 0,
+    "created_at": "2025-12-04T12:27:36Z",
+    "is_featured": false,
+    "id": 12,
+    "identifier": "claudemarketplaces",
+    "subcategory": "插件市场"
+  },
+  {
+    "title": "CCPlugins",
+    "description": "CCPlugins - 这是一个专业的 Claude Code 命令行框架，提供了 24 个经过精心策划的斜杠命令，旨在解决开发者使用 AI 时常见的低效问题，如生成不必要的测试文件或过度设计。它专注于提供结构化、可预测的、",
+    "type": "资源",
+    "category": "Claude Code 资源",
+    "tags": [
+      "Claude Code",
+      "AI编程",
+      "工具"
+    ],
+    "url": "https://github.com/brennercruvinel/CCPlugins",
+    "author": "devmaster.cn",
+    "view_count": 0,
+    "created_at": "2025-12-04T12:27:36Z",
+    "is_featured": false,
+    "id": 13,
+    "identifier": "ccplugins",
+    "subcategory": "插件市场"
+  },
+  {
+    "title": "awesome-claude-code",
+    "description": "awesome-claude-code - 这是一个精选的 Claude Code 资源列表，旨在提升用户的工作流程、生产力和体验。它收集了社区贡献的各种实用资源，包括 Agent Skills、工作流、知识指南、斜杠命令、CLAUDE.md ",
+    "type": "资源",
+    "category": "Claude Code 资源",
+    "tags": [
+      "Claude Code",
+      "AI编程",
+      "工具"
+    ],
+    "url": "https://github.com/hesreallyhim/awesome-claude-code",
+    "author": "devmaster.cn",
+    "view_count": 0,
+    "created_at": "2025-12-04T12:27:36Z",
+    "is_featured": false,
+    "id": 14,
+    "identifier": "awesome-claude-code",
+    "subcategory": "Skill"
+  },
+  {
+    "title": "superclaude",
+    "description": "superclaude - 这是一个社区驱动的开源项目，旨在通过提供额外的配置、工具和工作流来增强 Claude Code 的核心功能和用户体验。它可能包含各种优化脚本、界面增强或高级 Agent 管理功能，目标是让 Claud",
+    "type": "资源",
+    "category": "Claude Code 资源",
+    "tags": [
+      "Claude Code",
+      "AI编程",
+      "工具"
+    ],
+    "url": "https://github.com/SuperClaude-Org/SuperClaude_Framework",
+    "author": "devmaster.cn",
+    "view_count": 0,
+    "created_at": "2025-12-04T12:27:36Z",
+    "is_featured": false,
+    "id": 15,
+    "identifier": "superclaude",
+    "subcategory": "其他"
+  },
+  {
+    "title": "CCometixLine",
+    "description": "CCometixLine - 这是一个使用 Rust 编写的高性能 Claude Code 状态栏工具，旨在为开发者提供实时的环境信息和增强功能。它在状态栏上集成了 Git 分支状态、当前使用的 Claude 模型名称以及基于对话",
+    "type": "资源",
+    "category": "Claude Code 资源",
+    "tags": [
+      "Claude Code",
+      "AI编程",
+      "工具"
+    ],
+    "url": "https://github.com/Haleclipse/CCometixLine",
+    "author": "devmaster.cn",
+    "view_count": 0,
+    "created_at": "2025-12-04T12:27:36Z",
+    "is_featured": false,
+    "id": 16,
+    "identifier": "ccometixline",
+    "subcategory": "其他"
+  },
+  {
+    "title": "claude-code中文站",
+    "description": "claude-code中文站 - 该网站是专业的 AI 开发工具中文指南站，面向中文开发者提供从安装入门到高级进阶的系统化学习内容。它包含学习指南、实战案例、配置指南和实用工具等模块，重点介绍如何掌握 AI 辅助编程，例如“探索-计划",
+    "type": "资源",
+    "category": "Claude Code 资源",
+    "tags": [
+      "Claude Code",
+      "AI编程",
+      "工具"
+    ],
+    "url": "https://www.claude-code-hub.org/",
+    "author": "devmaster.cn",
+    "view_count": 0,
+    "created_at": "2025-12-04T12:27:36Z",
+    "is_featured": false,
+    "id": 17,
+    "identifier": "claude-code中文站",
+    "subcategory": "其他"
+  },
+  {
+    "title": "zcf",
+    "description": "zcf - zcf (Zero-Config Code Flow) 是一个面向 Claude Code 和 Codex 的零配置、一键式命令行工具，致力于简化复杂的 AI 编码环境搭建过程。它提供交互式菜单和 n",
+    "type": "资源",
+    "category": "Claude Code 资源",
+    "tags": [
+      "Claude Code",
+      "AI编程",
+      "工具"
+    ],
+    "url": "https://github.com/UfoMiao/zcf",
+    "author": "devmaster.cn",
+    "view_count": 0,
+    "created_at": "2025-12-04T12:27:36Z",
+    "is_featured": false,
+    "id": 18,
+    "identifier": "zcf",
+    "subcategory": "其他"
+  },
+  {
+    "title": "code router",
+    "description": "code router - 这是一个面向开发者或个人的 Claude Code 路由控制台，很可能是一个 API 网关或统一接入服务，用于管理和路由发送给不同 AI 编码模型（如 Claude Code/Codex）的请求。它通",
+    "type": "资源",
+    "category": "Claude Code 资源",
+    "tags": [
+      "Claude Code",
+      "AI编程",
+      "工具"
+    ],
+    "url": "https://api.codemirror.codes/console/personal",
+    "author": "devmaster.cn",
+    "view_count": 0,
+    "created_at": "2025-12-04T12:27:36Z",
+    "is_featured": false,
+    "id": 19,
+    "identifier": "code-router",
+    "subcategory": "模型服务"
+  },
+  {
+    "title": "aicodemirror",
+    "description": "aicodemirror - 这是一个 API 代理或镜像服务，专门用于提供 Claude Code 或其他 AI 编码工具的 API 接入。这类服务通常针对特定地区（如中文社区）的开发者，提供更稳定、响应更快的网络连接和更便捷的",
+    "type": "资源",
+    "category": "Claude Code 资源",
+    "tags": [
+      "Claude Code",
+      "AI编程",
+      "工具"
+    ],
+    "url": "https://www.aicodemirror.com/",
+    "author": "devmaster.cn",
+    "view_count": 0,
+    "created_at": "2025-12-04T12:27:36Z",
+    "is_featured": false,
+    "id": 20,
+    "identifier": "aicodemirror",
+    "subcategory": "模型服务"
+  },
+  {
+    "title": "any router",
+    "description": "any router - 这是一个通用的 AI 模型 API 路由服务，旨在作为一个统一的代理层，聚合包括 Claude 在内的多个主流 LLM API 接口。它为开发者提供单一的、高性能的 API 接入点，通常集成了动态故障",
+    "type": "资源",
+    "category": "Claude Code 资源",
+    "tags": [
+      "Claude Code",
+      "AI编程",
+      "工具"
+    ],
+    "url": "https://anyrouter.top/",
+    "author": "devmaster.cn",
+    "view_count": 0,
+    "created_at": "2025-12-04T12:27:36Z",
+    "is_featured": false,
+    "id": 21,
+    "identifier": "any-router",
+    "subcategory": "模型服务"
+  },
+  {
+    "title": "cc-switch",
+    "description": "cc-switch - CC Switch 是一款跨平台桌面应用，支持 Windows、macOS、Linux，可管理和切换 Claude Code、Codex 及 Gemini 的不同供应商配置，具备一键切换、双应用支持、",
+    "type": "资源",
+    "category": "Claude Code 资源",
+    "tags": [
+      "Claude Code",
+      "AI编程",
+      "工具"
+    ],
+    "url": "https://github.com/farion1231/cc-switch",
+    "author": "devmaster.cn",
+    "view_count": 0,
+    "created_at": "2025-12-04T12:27:36Z",
+    "is_featured": false,
+    "id": 22,
+    "identifier": "cc-switch",
+    "subcategory": "其他"
+  },
+  {
+    "title": "Skills 官方skill例子",
+    "description": "Skills 官方skill例子 - 这是 Anthropic 官方提供的 Agent Skills 示例代码库，旨在演示 Claude Skills 系统的功能和无限可能性。仓库中包含了大量示例 Skills，涵盖创意设计（如算法艺术）",
+    "type": "资源",
+    "category": "Claude Code 资源",
+    "tags": [
+      "Claude Code",
+      "AI编程",
+      "工具"
+    ],
+    "url": "https://github.com/anthropics/skills",
+    "author": "devmaster.cn",
+    "view_count": 0,
+    "created_at": "2025-12-04T12:27:36Z",
+    "is_featured": false,
+    "id": 23,
+    "identifier": "skills-官方skill例子",
+    "subcategory": "Skill"
+  },
+  {
+    "title": "awesomeAgentskills",
+    "description": "awesomeAgentskills - 这是一个精选的 Claude Code 和其他 AI 智能体技能集合，侧重于社区贡献的实用 Skills。它包含一系列提升开发和部署效率的专业技能，如 Next.js SaaS 框架文档参考、Web ",
+    "type": "资源",
+    "category": "Claude Code 资源",
+    "tags": [
+      "Claude Code",
+      "AI编程",
+      "工具"
+    ],
+    "url": "https://github.com/littleben/awesomeAgentskills",
+    "author": "devmaster.cn",
+    "view_count": 0,
+    "created_at": "2025-12-04T12:27:36Z",
+    "is_featured": false,
+    "id": 24,
+    "identifier": "awesomeagentskills",
+    "subcategory": "Skill"
+  },
+  {
+    "title": "Skills 官方指南",
+    "description": "Skills 官方指南 - 这是 Anthropic 官方 Agent Skills 的开发指南，详细介绍了 Skills 是一种模块化、可重用、基于文件系统的功能扩展，旨在将通用型 Claude Agent 转化为领域专家。指",
+    "type": "资源",
+    "category": "Claude Code 资源",
+    "tags": [
+      "Claude Code",
+      "AI编程",
+      "工具"
+    ],
+    "url": "https://docs.claude.com/en/docs/agents-and-tools/agent-skills/overview",
+    "author": "devmaster.cn",
+    "view_count": 0,
+    "created_at": "2025-12-04T12:27:36Z",
+    "is_featured": false,
+    "id": 25,
+    "identifier": "skills-官方指南",
+    "subcategory": "Skill"
+  },
+  {
+    "title": "agentsskills",
+    "description": "agentsskills - 这是全球首个 Claude Agent Skills 市场，由 WaytoAGI 社区驱动，致力于提供经过精选和测试的、可用于生产环境的 Skills 集合。它提供免费且开源的 SKILL.md 文件",
+    "type": "资源",
+    "category": "Claude Code 资源",
+    "tags": [
+      "Claude Code",
+      "AI编程",
+      "工具"
+    ],
+    "url": "https://agentskills.best/zh",
+    "author": "devmaster.cn",
+    "view_count": 0,
+    "created_at": "2025-12-04T12:27:36Z",
+    "is_featured": false,
+    "id": 26,
+    "identifier": "agentsskills",
+    "subcategory": "Skill"
+  },
+  {
+    "title": "awesome-claude-skills",
+    "description": "awesome-claude-skills - 这是一个精心策划的实用 Claude Skills 列表，旨在通过定制化工作流提高在 Claude.ai、Claude Code 和 API 上的生产力。Skills 被分为文档处理、开发工具、商业营",
+    "type": "资源",
+    "category": "Claude Code 资源",
+    "tags": [
+      "Claude Code",
+      "AI编程",
+      "工具"
+    ],
+    "url": "https://github.com/ComposioHQ/awesome-claude-skills",
+    "author": "devmaster.cn",
+    "view_count": 0,
+    "created_at": "2025-12-04T12:27:36Z",
+    "is_featured": false,
+    "id": 27,
+    "identifier": "awesome-claude-skills",
+    "subcategory": "Skill"
   }
 ]
-

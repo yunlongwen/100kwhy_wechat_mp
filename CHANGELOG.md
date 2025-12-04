@@ -4,7 +4,44 @@
 
 ---
 
-## v4.0（当前版本）
+## v4.1（当前版本）
+
+### 新增功能
+- ✅ **Claude Code 资源模块**
+  - 新增 Claude Code 资源分类，包含17个精选资源
+  - 支持四个子分类浏览：
+    - 🔌 插件市场：Claude Code 插件和扩展市场
+    - 🌐 模型服务：API代理、路由服务等
+    - 🎯 Skill：Agent Skills 相关资源
+    - 📦 其他：其他 Claude Code 相关资源
+  - 智能分类算法，根据资源标题、描述和URL自动分类
+  - 桌面端支持hover子菜单，移动端支持展开子菜单
+  - 从 devmaster.cn 自动抓取资源数据
+
+### 修复问题
+- ✅ 修复每周资讯页面重复显示标题的问题
+  - API返回的HTML已包含标题，前端不再重复渲染
+- ✅ 修复资源显示代码的语法错误
+  - 修复else分支中代码缩进问题，导致JavaScript语法错误
+  - 修复后菜单点击功能恢复正常
+
+### 技术实现
+- 新增抓取脚本：`scripts/crawl_devmaster_resources.py`
+  - 支持抓取 Claude Code 资源
+  - 使用 Playwright 抓取动态内容
+  - 自动分类到四个子类
+- 新增更新脚本：`scripts/update_claude_code_subcategories.py`
+  - 为现有资源添加subcategory字段
+- 扩展API：支持 `subcategory` 参数过滤
+- 扩展数据模型：为Claude Code资源添加 `subcategory` 字段
+- 更新UI：添加子分类菜单和显示逻辑
+
+### 数据文件
+- `data/resources.json` - 新增17个Claude Code资源，包含subcategory字段
+
+---
+
+## v4.0
 
 ### 重大更新
 - ✅ 全新导航菜单结构

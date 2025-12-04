@@ -608,6 +608,30 @@ INDEX_HTML = """
                         <a href="/resources?category=Cursor资源" class="block px-5 py-3 text-base tech-font-nav text-gray-300 hover:text-neon-purple transition-all">
                           🎯 Cursor资源
                         </a>
+                        <div class="relative group">
+                          <a href="/resources?category=Claude Code 资源" class="block px-5 py-3 text-base tech-font-nav text-gray-300 hover:text-neon-purple transition-all">
+                            🤖 Claude Code 资源
+                            <svg class="w-3 h-3 inline ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                            </svg>
+                          </a>
+                          <div class="absolute left-full top-0 ml-1 w-48 hidden group-hover:block z-50">
+                            <div class="glass rounded-lg border border-dark-border shadow-lg">
+                              <a href="/resources?category=Claude Code 资源&subcategory=插件市场" class="block px-5 py-3 text-sm tech-font-nav text-gray-300 hover:text-neon-purple transition-all">
+                                🔌 插件市场
+                              </a>
+                              <a href="/resources?category=Claude Code 资源&subcategory=模型服务" class="block px-5 py-3 text-sm tech-font-nav text-gray-300 hover:text-neon-purple transition-all">
+                                🌐 模型服务
+                              </a>
+                              <a href="/resources?category=Claude Code 资源&subcategory=Skill" class="block px-5 py-3 text-sm tech-font-nav text-gray-300 hover:text-neon-purple transition-all">
+                                🎯 Skill
+                              </a>
+                              <a href="/resources?category=Claude Code 资源&subcategory=其他" class="block px-5 py-3 text-sm tech-font-nav text-gray-300 hover:text-neon-purple transition-all">
+                                📦 其他
+                              </a>
+                            </div>
+                          </div>
+                        </div>
                       </div>
                     </div>
                     <a href="/wechat-mp" class="top-nav-item px-5 py-3 text-base tech-font-nav text-gray-300 hover:text-neon-cyan rounded-lg transition-all whitespace-nowrap">
@@ -670,6 +694,20 @@ INDEX_HTML = """
                   <a href="/resources?category=飞书知识库" class="mobile-nav-link">📚 飞书知识库</a>
                   <a href="/resources?category=技术社区" class="mobile-nav-link">👥 技术社区</a>
                   <a href="/resources?category=Cursor资源" class="mobile-nav-link">🎯 Cursor资源</a>
+                  <div class="mobile-nav-submenu">
+                    <div class="mobile-nav-submenu-header" onclick="toggleMobileClaudeCodeSubmenu()">
+                      🤖 Claude Code 资源
+                      <svg class="w-4 h-4 transition-transform duration-200 inline ml-1" id="mobile-claude-code-arrow" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                      </svg>
+                    </div>
+                    <div class="mobile-nav-submenu-content hidden pl-4" id="mobile-claude-code-submenu">
+                      <a href="/resources?category=Claude Code 资源&subcategory=插件市场" class="mobile-nav-link">🔌 插件市场</a>
+                      <a href="/resources?category=Claude Code 资源&subcategory=模型服务" class="mobile-nav-link">🌐 模型服务</a>
+                      <a href="/resources?category=Claude Code 资源&subcategory=Skill" class="mobile-nav-link">🎯 Skill</a>
+                      <a href="/resources?category=Claude Code 资源&subcategory=其他" class="mobile-nav-link">📦 其他</a>
+                    </div>
+                  </div>
                 </div>
               </div>
               <a href="/wechat-mp" class="mobile-nav-link">📱 微信公众号</a>
@@ -1959,9 +1997,10 @@ INDEX_HTML = """
                 mainContent.innerHTML = '<div class="text-center py-20"><div class="inline-block animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-neon-cyan"></div></div>';
                 
                 try {
-                  // 从URL参数获取category
+                  // 从URL参数获取category和subcategory
                   const urlParams = new URLSearchParams(window.location.search);
                   const urlCategory = urlParams.get('category');
+                  const urlSubcategory = urlParams.get('subcategory');
                   if (urlCategory) {
                     category = urlCategory;
                   }
@@ -1970,6 +2009,9 @@ INDEX_HTML = """
                   let apiUrl = `${API_BASE}/resources?page=1&page_size=100`;
                   if (category) {
                     apiUrl += `&category=${encodeURIComponent(category)}`;
+                  }
+                  if (urlSubcategory) {
+                    apiUrl += `&subcategory=${encodeURIComponent(urlSubcategory)}`;
                   }
                   
                   const response = await fetch(apiUrl);
@@ -1986,6 +2028,10 @@ INDEX_HTML = """
                   let displayItems = data.items;
                   if (category) {
                     displayItems = data.items.filter(resource => resource.category === category);
+                    // 如果有subcategory参数，进一步过滤
+                    if (urlSubcategory) {
+                      displayItems = displayItems.filter(resource => resource.subcategory === urlSubcategory);
+                    }
                   }
                   
                   let html = `
@@ -2000,12 +2046,19 @@ INDEX_HTML = """
                   } else {
                     if (category) {
                       // 如果指定了分类，直接显示该分类的资源
-                      const categoryIcon = category === '飞书知识库' ? '📚' : category === '技术社区' ? '👥' : category === 'Cursor资源' ? '🎯' : '📦';
+                      const categoryIcon = category === '飞书知识库' ? '📚' : category === '技术社区' ? '👥' : category === 'Cursor资源' ? '🎯' : category === 'Claude Code 资源' ? '🤖' : '📦';
+                      
+                      // 如果是Claude Code资源且有subcategory，显示子分类标题
+                      let categoryTitle = category;
+                      if (category === 'Claude Code 资源' && urlSubcategory) {
+                        const subcategoryIcon = urlSubcategory === '插件市场' ? '🔌' : urlSubcategory === '模型服务' ? '🌐' : urlSubcategory === 'Skill' ? '🎯' : '📦';
+                        categoryTitle = `${category} - ${subcategoryIcon} ${urlSubcategory}`;
+                      }
                       
                       html += `
                         <div class="mb-8">
                           <h2 class="text-2xl font-bold text-neon-cyan mb-4 flex items-center gap-2">
-                            ${categoryIcon} ${category}
+                            ${categoryIcon} ${categoryTitle}
                           </h2>
                           <div class="space-y-4">
                       `;
@@ -2043,7 +2096,7 @@ INDEX_HTML = """
                         resourcesByCategory[cat].push(resource);
                       });
                       
-                      const categoryOrder = ['飞书知识库', '技术社区', 'Cursor资源', '其他'];
+                      const categoryOrder = ['飞书知识库', '技术社区', 'Cursor资源', 'Claude Code 资源', '其他'];
                       const sortedCategories = Object.keys(resourcesByCategory).sort((a, b) => {
                         const indexA = categoryOrder.indexOf(a);
                         const indexB = categoryOrder.indexOf(b);
@@ -2055,38 +2108,96 @@ INDEX_HTML = """
                       
                       sortedCategories.forEach(cat => {
                         const resources = resourcesByCategory[cat];
-                        const categoryIcon = cat === '飞书知识库' ? '📚' : cat === '技术社区' ? '👥' : cat === 'Cursor资源' ? '🎯' : '📦';
+                        const categoryIcon = cat === '飞书知识库' ? '📚' : cat === '技术社区' ? '👥' : cat === 'Cursor资源' ? '🎯' : cat === 'Claude Code 资源' ? '🤖' : '📦';
                         
-                        html += `
-                          <div class="mb-8">
-                            <h2 class="text-2xl font-bold text-neon-cyan mb-4 flex items-center gap-2">
-                              ${categoryIcon} ${cat}
-                            </h2>
-                            <div class="space-y-4">
-                        `;
-                        
-                        resources.forEach(resource => {
+                        // 如果是Claude Code资源，按subcategory分组
+                        if (cat === 'Claude Code 资源') {
+                          const subcategories = {};
+                          resources.forEach(resource => {
+                            const subcat = resource.subcategory || '其他';
+                            if (!subcategories[subcat]) {
+                              subcategories[subcat] = [];
+                            }
+                            subcategories[subcat].push(resource);
+                          });
+                          
+                          const subcategoryOrder = ['插件市场', '模型服务', 'Skill', '其他'];
+                          const sortedSubcategories = Object.keys(subcategories).sort((a, b) => {
+                            const indexA = subcategoryOrder.indexOf(a);
+                            const indexB = subcategoryOrder.indexOf(b);
+                            if (indexA === -1 && indexB === -1) return a.localeCompare(b);
+                            if (indexA === -1) return 1;
+                            if (indexB === -1) return -1;
+                            return indexA - indexB;
+                          });
+                          
+                          sortedSubcategories.forEach(subcat => {
+                            const subcatResources = subcategories[subcat];
+                            const subcategoryIcon = subcat === '插件市场' ? '🔌' : subcat === '模型服务' ? '🌐' : subcat === 'Skill' ? '🎯' : '📦';
+                            
+                            html += `
+                              <div class="mb-8">
+                                <h3 class="text-xl font-bold text-neon-purple mb-4 flex items-center gap-2">
+                                  ${subcategoryIcon} ${subcat}
+                                </h3>
+                                <div class="space-y-4">
+                            `;
+                            
+                            subcatResources.forEach(resource => {
+                              html += `
+                                <article class="glass rounded-xl border border-dark-border p-6 card-hover">
+                                  <div class="flex items-start gap-3 mb-2">
+                                    <span class="text-sm px-2 py-1 glass border border-neon-purple/30 text-neon-purple rounded">${resource.type || '资源'}</span>
+                                  </div>
+                                  <h3 class="text-xl font-semibold text-gray-100 mb-2">
+                                    <a href="${resource.url}" target="_blank" class="hover:text-neon-cyan transition-colors">${resource.title}</a>
+                                  </h3>
+                                  <p class="text-sm text-gray-300 mb-3">${resource.description}</p>
+                                  ${resource.author ? `<p class="text-xs text-gray-400 mb-3">作者: ${resource.author}</p>` : ''}
+                                  <div class="flex items-center gap-2 flex-wrap">
+                                    ${(resource.tags || []).map(tag => `<span class="px-2 py-1 glass text-neon-cyan text-xs rounded border border-neon-cyan/30">${tag}</span>`).join('')}
+                                  </div>
+                                </article>
+                              `;
+                            });
+                            
+                            html += `
+                                </div>
+                              </div>
+                            `;
+                          });
+                        } else {
                           html += `
-                            <article class="glass rounded-xl border border-dark-border p-6 card-hover">
-                              <div class="flex items-start gap-3 mb-2">
-                                <span class="text-sm px-2 py-1 glass border border-neon-purple/30 text-neon-purple rounded">${resource.type || '资源'}</span>
-                              </div>
-                              <h3 class="text-xl font-semibold text-gray-100 mb-2">
-                                <a href="${resource.url}" target="_blank" class="hover:text-neon-cyan transition-colors">${resource.title}</a>
-                              </h3>
-                              <p class="text-sm text-gray-300 mb-3">${resource.description}</p>
-                              ${resource.author ? `<p class="text-xs text-gray-400 mb-3">作者: ${resource.author}</p>` : ''}
-                              <div class="flex items-center gap-2 flex-wrap">
-                                ${(resource.tags || []).map(tag => `<span class="px-2 py-1 glass text-neon-cyan text-xs rounded border border-neon-cyan/30">${tag}</span>`).join('')}
-                              </div>
-                            </article>
+                            <div class="mb-8">
+                              <h2 class="text-2xl font-bold text-neon-cyan mb-4 flex items-center gap-2">
+                                ${categoryIcon} ${cat}
+                              </h2>
+                              <div class="space-y-4">
                           `;
-                        });
-                        
-                        html += `
+                          
+                          resources.forEach(resource => {
+                            html += `
+                              <article class="glass rounded-xl border border-dark-border p-6 card-hover">
+                                <div class="flex items-start gap-3 mb-2">
+                                  <span class="text-sm px-2 py-1 glass border border-neon-purple/30 text-neon-purple rounded">${resource.type || '资源'}</span>
+                                </div>
+                                <h3 class="text-xl font-semibold text-gray-100 mb-2">
+                                  <a href="${resource.url}" target="_blank" class="hover:text-neon-cyan transition-colors">${resource.title}</a>
+                                </h3>
+                                <p class="text-sm text-gray-300 mb-3">${resource.description}</p>
+                                ${resource.author ? `<p class="text-xs text-gray-400 mb-3">作者: ${resource.author}</p>` : ''}
+                                <div class="flex items-center gap-2 flex-wrap">
+                                  ${(resource.tags || []).map(tag => `<span class="px-2 py-1 glass text-neon-cyan text-xs rounded border border-neon-cyan/30">${tag}</span>`).join('')}
+                                </div>
+                              </article>
+                            `;
+                          });
+                          
+                          html += `
+                              </div>
                             </div>
-                          </div>
-                        `;
+                          `;
+                        }
                       });
                     }
                   }
@@ -2422,10 +2533,6 @@ INDEX_HTML = """
                   const data = await response.json();
 
                   let html = `
-                    <div class="mb-6">
-                      <h1 class="text-4xl tech-font-bold text-neon-cyan text-glow mb-2">${data.title || weeklyId}</h1>
-                      <p class="text-base text-gray-400 tech-font mb-4">${data.description || '每周资讯汇总'}</p>
-                    </div>
                     <div class="glass rounded-xl border border-dark-border p-8">
                       <div class="prose prose-invert max-w-none">
                         ${data.content || '<p class="text-gray-400">暂无内容</p>'}
@@ -2691,6 +2798,21 @@ INDEX_HTML = """
               function toggleMobileResourcesSubmenu() {
                 const submenu = document.getElementById('mobile-resources-submenu');
                 const arrow = document.getElementById('mobile-resources-arrow');
+
+                if (submenu.classList.contains('open')) {
+                  submenu.classList.remove('open');
+                  submenu.classList.add('hidden');
+                  arrow.style.transform = 'rotate(0deg)';
+                } else {
+                  submenu.classList.remove('hidden');
+                  submenu.classList.add('open');
+                  arrow.style.transform = 'rotate(90deg)';
+                }
+              }
+              
+              function toggleMobileClaudeCodeSubmenu() {
+                const submenu = document.getElementById('mobile-claude-code-submenu');
+                const arrow = document.getElementById('mobile-claude-code-arrow');
 
                 if (submenu.classList.contains('open')) {
                   submenu.classList.remove('open');
