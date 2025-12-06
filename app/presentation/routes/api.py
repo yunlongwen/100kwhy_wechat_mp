@@ -20,6 +20,7 @@ except Exception as e:
     logger.warning(f"加载 .env 文件失败: {e}")
 
 from ...services.data_loader import DataLoader
+from ...services.database_data_service import DatabaseDataService
 
 router = APIRouter()
 
@@ -48,7 +49,7 @@ async def get_tools(
     """获取工具列表（支持分页和筛选）"""
     try:
         logger.info(f"获取工具列表: category={category}, featured={featured}, page={page}, sort_by={sort_by}")
-        tools, total = DataLoader.get_tools(
+        tools, total = await DatabaseDataService.get_tools(
             category=category,
             featured=featured,
             page=page,
@@ -104,10 +105,10 @@ async def get_tool_detail(tool_id_or_identifier: str):
     # 尝试按ID查找（如果是数字）
     try:
         tool_id = int(tool_id_or_identifier)
-        tool = DataLoader.get_tool_by_id(tool_id=tool_id)
+        tool = await DatabaseDataService.get_tool_by_id(tool_id=tool_id)
     except ValueError:
         # 如果不是数字，则按identifier查找
-        tool = DataLoader.get_tool_by_id(tool_identifier=tool_id_or_identifier)
+        tool = await DatabaseDataService.get_tool_by_id(tool_identifier=tool_id_or_identifier)
     
     if not tool:
         raise HTTPException(status_code=404, detail="工具不存在")
@@ -120,7 +121,7 @@ async def get_tool_detail(tool_id_or_identifier: str):
     # 获取相关文章（优先使用 identifier，如果没有则使用工具名称）
     tool_name = tool.get("name", "")
     tool_identifier = tool.get("identifier")
-    related_articles, total_articles = DataLoader.get_articles_by_tool(
+    related_articles, total_articles = await DatabaseDataService.get_articles_by_tool(
         tool_name=tool_name,
         tool_id=tool_id,
         tool_identifier=tool_identifier,
@@ -151,7 +152,7 @@ async def get_news(
     - category="ai_news" -> 文件: ai_news.json -> UI显示: "AI资讯"
     """
     try:
-        articles, total = DataLoader.get_articles(
+        articles, total = await DatabaseDataService.get_articles(
             category=category,
             page=page,
             page_size=page_size,
@@ -204,7 +205,7 @@ async def get_recent(
     """获取最新资讯（合并编程资讯和AI资讯，按时间排序）"""
     try:
         # 获取所有文章（不分类），按归档时间排序
-        articles, total = DataLoader.get_articles(
+        articles, total = await DatabaseDataService.get_articles(
             category=None,  # 不分类，获取所有文章
             page=page,
             page_size=page_size,
@@ -243,7 +244,7 @@ async def get_config():
 async def record_article_click_by_url(url: str = Query(..., description="文章URL")):
     """通过URL记录文章点击，增加热度"""
     try:
-        success = DataLoader.increment_article_view_count(url)
+        success = await DatabaseDataService.increment_article_view_count(url)
         if success:
             return {"ok": True, "message": "点击已记录"}
         else:
@@ -287,7 +288,7 @@ async def submit_tool(request: dict):
                 return {"ok": False, "message": "该工具已存在于候选池中"}
         
         # 检查是否已在正式工具池中
-        all_tools, _ = DataLoader.get_tools(category=None, page=1, page_size=1000)
+        all_tools, _ = await DatabaseDataService.get_tools(category=None, page=1, page_size=1000)
         for tool in all_tools:
             if tool.get("url") == url:
                 logger.warning(f"工具已存在于正式工具池: {url}")
@@ -430,7 +431,7 @@ async def record_tool_click(tool_id_or_identifier: str):
             # 如果不是数字，则按identifier查找
             tool_identifier = tool_id_or_identifier
         
-        success = DataLoader.increment_tool_view_count(tool_id=tool_id, tool_identifier=tool_identifier)
+        success = await DatabaseDataService.increment_tool_view_count(tool_id=tool_id, tool_identifier=tool_identifier)
         if success:
             return {"ok": True, "message": "点击已记录"}
         else:
@@ -574,7 +575,7 @@ async def get_prompts(
 ):
     """获取提示词列表（支持分页和筛选）"""
     try:
-        prompts, total = DataLoader.get_prompts(
+        prompts, total = await DatabaseDataService.get_prompts(
             category=category,
             page=page,
             page_size=page_size,
@@ -597,7 +598,7 @@ async def get_prompts(
 async def get_prompt_content(identifier: str):
     """获取指定提示词的内容"""
     try:
-        content = DataLoader.get_prompt_content(identifier)
+        content = await DatabaseDataService.get_prompt_content(identifier)
         if content is None:
             raise HTTPException(status_code=404, detail="提示词不存在")
         return {"content": content}
@@ -617,7 +618,7 @@ async def get_rules(
 ):
     """获取规则列表（支持分页和筛选）"""
     try:
-        rules, total = DataLoader.get_rules(
+        rules, total = await DatabaseDataService.get_rules(
             category=category,
             page=page,
             page_size=page_size,
@@ -647,7 +648,7 @@ async def get_resources(
 ):
     """获取社区资源列表（支持分页和筛选）"""
     try:
-        resources, total = DataLoader.get_resources(
+        resources, total = await DatabaseDataService.get_resources(
             type=type,
             category=category,
             subcategory=subcategory,

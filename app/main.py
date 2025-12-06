@@ -36,6 +36,7 @@ from loguru import logger
 
 from .config_loader import load_digest_schedule
 from .infrastructure import setup_logging, SchedulerManager
+from .infrastructure.db import init_db
 from .presentation import get_index_html
 from .services import DigestService, BackupService
 
@@ -52,6 +53,14 @@ async def lifespan(app: FastAPI):
     setup_logging()
     logger.info("=" * 80)
     logger.info("应用启动，初始化日志系统和调度器...")
+    
+    # 初始化数据库
+    try:
+        await init_db()
+        logger.info("[数据库] 数据库初始化完成")
+    except Exception as e:
+        logger.error(f"[数据库] 数据库初始化失败: {e}")
+        # 数据库初始化失败不影响应用启动，但会记录错误
     
     # 创建调度器管理器
     scheduler_manager = SchedulerManager(timezone="Asia/Shanghai")
@@ -108,14 +117,14 @@ async def lifespan(app: FastAPI):
     else:
         logger.error("[调度器] 警告：推送任务添加失败，未找到任务！")
 
-    # 添加数据备份任务：每天 23:00 执行
+    # 添加数据备份任务：每天 23:00 执行（备份config目录）
     scheduler_manager.add_cron_job(
         backup_service.backup_data_to_github,
         hour=23,
         minute=0,
         job_id="daily_data_backup",
     )
-    logger.info("[调度器] 已添加数据备份任务，每日 23:00 执行")
+    logger.info("[调度器] 已添加数据备份任务，每日 23:00 执行（备份config目录）")
     
     # 启动调度器
     scheduler_manager.start()

@@ -66,8 +66,7 @@
 **后端**：
 - Python 3.10+
 - FastAPI + Uvicorn
-- JSON文件存储（`data/` 目录）
-- SQLAlchemy + aiosqlite（数据库支持）
+- SQLite数据库（SQLAlchemy + aiosqlite）
 - APScheduler（定时任务调度）
 - loguru（日志）
 - Playwright（网页爬虫）
@@ -82,7 +81,8 @@
 - Google Fonts（Orbitron、Rajdhani）
 
 **数据服务**：
-- `DataLoader` - 统一的数据加载和保存服务
+- `DatabaseDataService` - 从数据库读取数据
+- `DatabaseWriteService` - 将数据写入数据库
 - 支持分页、筛选、搜索、排序
 - 支持点击统计和文章-工具关联
 - 支持提示词、规则、社区资源等新数据类型
@@ -102,9 +102,12 @@ app/
     notifiers/          # 通知服务（企业微信、微信公众号）
     db/                 # 数据库
   services/             # 服务层（业务服务）
-    data_loader.py      # 数据加载和保存服务
+    database_data_service.py  # 数据库读取服务
+    database_write_service.py # 数据库写入服务
+    data_loader.py      # 数据加载服务（仅用于候选池等临时数据）
     digest_service.py   # 推送服务
     backup_service.py   # 备份服务
+    weekly_backup_service.py  # 手动备份服务（从数据库导出JSON）
     weekly_digest.py    # 周报生成服务
     crawler_service.py  # 爬虫服务
   presentation/          # 表示层
@@ -119,23 +122,19 @@ config/
   crawler_keywords.json # 抓取关键词
   digest_schedule.json  # 推送调度配置
 data/
-  config.json           # 页面和分类配置
-  articles/             # 正式文章池
-    programming.json   # 编程资讯
-    ai_news.json       # AI资讯
-    ai_coding.json     # AI编程资讯
+  config.json           # 页面和分类配置（仅用于前端展示配置）
+  articles/             # 文章候选池和推送列表（JSON文件，仅用于候选数据）
     ai_candidates.json # 文章候选池
     ai_articles.json   # 资讯推送列表
-  tools/                # 正式工具池
-    featured.json      # 热门工具
-    {category}.json   # 各分类工具
+  tools/                # 工具候选池（JSON文件，仅用于候选数据）
     tool_candidates.json  # 工具候选池
-  prompts/              # 提示词数据
-    prompts.json       # 提示词列表
-  rules.json            # 规则数据
-  resources.json        # 社区资源数据
+  prompts/              # 提示词备份文件（从数据库导出）
+    prompts.json       # 提示词备份
+  rules.json            # 规则备份文件（从数据库导出）
+  resources.json        # 社区资源备份文件（从数据库导出）
   weekly/               # 周报文件
     {year}weekly{week}.md  # 每周资讯汇总
+data.db                 # SQLite数据库（主要数据存储）
 docs/
   technical/            # 技术文档
     ARCHITECTURE.md    # 架构设计文档
@@ -289,7 +288,7 @@ uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 - ✅ 定时抓取文章（支持RSS、GitHub Trending、Hacker News等）
 - ✅ 自动推送到企业微信
 - ✅ 自动生成周报
-- ✅ 自动备份数据到GitHub
+- ✅ 手动备份数据到GitHub（管理员面板操作）
 
 ### 技术特性
 - ✅ 标准URL路由（无 `#` 符号）

@@ -1,4 +1,12 @@
-"""数据加载服务 - 支持分页加载工具和资讯数据"""
+"""数据加载服务 - 仅用于候选池等临时数据的JSON文件操作
+
+注意：主要数据已迁移到数据库，此服务仅用于：
+- 文章候选池（ai_candidates.json）
+- 工具候选池（tool_candidates.json）
+- 文章推送列表（ai_articles.json）
+
+所有正式数据（归档的文章、工具、提示词、规则、资源）都存储在数据库中。
+"""
 import json
 from pathlib import Path
 from typing import List, Dict, Optional, Tuple
@@ -8,6 +16,7 @@ import os
 from urllib.parse import urlparse, parse_qs
 
 # 数据目录路径（指向项目根目录的data文件夹）
+# 注意：此目录主要用于候选池和备份文件，正式数据存储在数据库中
 # app/services/data_loader.py -> app/services -> app -> 项目根目录 -> data
 DATA_DIR = Path(__file__).resolve().parent.parent.parent / "data"
 TOOLS_DIR = DATA_DIR / "tools"
@@ -59,6 +68,9 @@ class DataLoader:
         """
         获取工具列表（支持分页）
         
+        注意：此方法已废弃，正式数据应从数据库读取。
+        此方法仅用于向后兼容，实际应该使用 DatabaseDataService.get_tools()
+        
         Args:
             category: 工具分类
             featured: 是否热门（True/False/None）
@@ -70,25 +82,28 @@ class DataLoader:
         Returns:
             (工具列表, 总数)
         """
-        # 加载所有工具文件
+        # 注意：此方法已废弃，正式数据应从数据库读取
+        logger.warning("DataLoader.get_tools() 已废弃，请使用 DatabaseDataService.get_tools()")
+        
+        # 加载所有工具文件（仅用于向后兼容）
         all_tools = []
         
         logger.debug(f"TOOLS_DIR: {TOOLS_DIR}, exists: {TOOLS_DIR.exists()}")
         
-        # 加载热门工具（featured.json）
+        # 加载热门工具（featured.json）- 仅用于向后兼容
         featured_file = TOOLS_DIR / "featured.json"
         featured_tools = DataLoader._load_json_file(featured_file)
         logger.debug(f"Loaded {len(featured_tools)} tools from featured.json")
         all_tools.extend(featured_tools)
         
-        # 按分类加载工具（如果有分类文件）
+        # 按分类加载工具（如果有分类文件）- 仅用于向后兼容
         if category:
             category_file = TOOLS_DIR / f"{category}.json"
             category_tools = DataLoader._load_json_file(category_file)
             logger.debug(f"Loaded {len(category_tools)} tools from {category}.json")
             all_tools.extend(category_tools)
         else:
-            # 加载所有分类文件
+            # 加载所有分类文件（仅用于向后兼容）
             category_files = list(TOOLS_DIR.glob("*.json"))
             logger.debug(f"Found {len(category_files)} JSON files in tools directory")
             for category_file in category_files:
@@ -226,6 +241,9 @@ class DataLoader:
         """
         获取文章列表（支持分页）
         
+        注意：此方法已废弃，正式数据应从数据库读取。
+        此方法仅用于向后兼容，实际应该使用 DatabaseDataService.get_articles()
+        
         Args:
             category: 文章分类（programming, ai_news等）
             page: 页码（从1开始）
@@ -236,13 +254,13 @@ class DataLoader:
         Returns:
             (文章列表, 总数)
         """
+        # 注意：此方法已废弃，正式数据应从数据库读取
+        logger.warning("DataLoader.get_articles() 已废弃，请使用 DatabaseDataService.get_articles()")
+        
         all_articles = []
         
-        # 加载所有文章文件（处理分类名称到文件名的映射）
-        # 
-        # 映射关系说明：
-        # - category="programming" -> 文件: programming.json -> UI显示: "编程资讯"
-        # - category="ai_news" -> 文件: ai_news.json -> UI显示: "AI资讯"
+        # 加载所有文章文件（仅用于向后兼容）
+        # 注意：正式数据已迁移到数据库，此方法仅用于向后兼容
         if category:
             # ai_news -> ai_news.json, programming -> programming.json
             category_file_name = f"{category}.json"
@@ -411,6 +429,9 @@ class DataLoader:
         """
         将文章归档到指定分类的JSON文件
         
+        注意：此方法已废弃，正式数据应写入数据库。
+        此方法仅用于向后兼容，实际应该使用 DatabaseWriteService.archive_article_to_category()
+        
         Args:
             article: 文章数据字典
             category: 分类名称（如 programming, ai_news）
@@ -419,6 +440,7 @@ class DataLoader:
         Returns:
             是否成功
         """
+        logger.warning("DataLoader.archive_article_to_category() 已废弃，请使用 DatabaseWriteService.archive_article_to_category()")
         try:
             # 生成文章ID（如果没有）
             if "id" not in article:
@@ -814,6 +836,9 @@ class DataLoader:
         """
         将工具保存到指定分类的JSON文件中
         
+        注意：此方法已废弃，正式数据应写入数据库。
+        此方法仅用于向后兼容，实际应该使用 DatabaseWriteService.archive_tool_to_category()
+        
         Args:
             tool: 工具数据字典
             category: 工具分类
@@ -821,6 +846,7 @@ class DataLoader:
         Returns:
             是否成功
         """
+        logger.warning("DataLoader.archive_tool_to_category() 已废弃，请使用 DatabaseWriteService.archive_tool_to_category()")
         try:
             category_file = TOOLS_DIR / f"{category}.json"
             
@@ -849,7 +875,13 @@ class DataLoader:
         page_size: int = 20,
         search: Optional[str] = None
     ) -> Tuple[List[Dict], int]:
-        """获取提示词列表（支持分页和筛选）"""
+        """
+        获取提示词列表（支持分页和筛选）
+        
+        注意：此方法已废弃，正式数据应从数据库读取。
+        此方法仅用于向后兼容，实际应该使用 DatabaseDataService.get_prompts()
+        """
+        logger.warning("DataLoader.get_prompts() 已废弃，请使用 DatabaseDataService.get_prompts()")
         prompts_file = DATA_DIR / "prompts" / "prompts.json"
         all_prompts = DataLoader._load_json_file(prompts_file)
         
@@ -898,7 +930,13 @@ class DataLoader:
         page_size: int = 20,
         search: Optional[str] = None
     ) -> Tuple[List[Dict], int]:
-        """获取规则列表（支持分页和筛选）"""
+        """
+        获取规则列表（支持分页和筛选）
+        
+        注意：此方法已废弃，正式数据应从数据库读取。
+        此方法仅用于向后兼容，实际应该使用 DatabaseDataService.get_rules()
+        """
+        logger.warning("DataLoader.get_rules() 已废弃，请使用 DatabaseDataService.get_rules()")
         rules_file = DATA_DIR / "rules.json"
         all_rules = DataLoader._load_json_file(rules_file)
         
@@ -934,7 +972,13 @@ class DataLoader:
         page_size: int = 20,
         search: Optional[str] = None
     ) -> Tuple[List[Dict], int]:
-        """获取社区资源列表（支持分页和筛选）"""
+        """
+        获取社区资源列表（支持分页和筛选）
+        
+        注意：此方法已废弃，正式数据应从数据库读取。
+        此方法仅用于向后兼容，实际应该使用 DatabaseDataService.get_resources()
+        """
+        logger.warning("DataLoader.get_resources() 已废弃，请使用 DatabaseDataService.get_resources()")
         resources_file = DATA_DIR / "resources.json"
         all_resources = DataLoader._load_json_file(resources_file)
         

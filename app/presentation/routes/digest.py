@@ -55,6 +55,7 @@ from ...domain.sources.tool_candidates import (
     CandidateTool,
 )
 from ...services.weekly_digest import update_weekly_digest
+from ...services.weekly_backup_service import WeeklyBackupService
 import json
 from pathlib import Path
 
@@ -229,7 +230,8 @@ async def list_all_articles(admin: None = Depends(_require_admin)):
             "summary": article.summary if hasattr(article, 'summary') else article.get("summary", ""),
         }
         # 检查归档状态
-        article_dict["is_archived"] = DataLoader.is_article_archived(article_dict.get("url", ""))
+        from ...services.database_data_service import DatabaseDataService
+        article_dict["is_archived"] = await DatabaseDataService.is_article_archived(article_dict.get("url", ""))
         articles_with_status.append(article_dict)
     
     return {"ok": True, "articles": articles_with_status}
@@ -298,7 +300,8 @@ async def list_candidate_articles(admin: None = Depends(_require_admin)):
         
         # 检查是否已归档
         candidate_dict = asdict(candidate)
-        candidate_dict["is_archived"] = DataLoader.is_article_archived(candidate.url)
+        from ...services.database_data_service import DatabaseDataService
+        candidate_dict["is_archived"] = await DatabaseDataService.is_article_archived(candidate.url)
         grouped_candidates[keyword].append(candidate_dict)
 
     return {"ok": True, "grouped_candidates": grouped_candidates}
@@ -365,7 +368,8 @@ async def accept_candidate(request: CandidateActionRequest, admin: None = Depend
         # 工具关键字爬取的资讯：归档到编程资讯（programming.json）
         # 注意：工具关键字资讯只能手动触发爬取，采纳后只归档到编程资讯，不进入推送列表
         # category="programming" -> 文件: programming.json -> UI显示: "编程资讯"
-        success = DataLoader.archive_article_to_category(
+        from ...services.database_write_service import DatabaseWriteService
+        success = await DatabaseWriteService.archive_article_to_category(
             article_to_accept, 
             category="programming",  # Category值，对应文件: programming.json
             tool_tags=article_to_accept.get("tool_tags", [])
@@ -478,7 +482,8 @@ async def archive_candidate(request: ArchiveArticleRequest, admin: None = Depend
     
     # 使用DataLoader归档文章
     from ...services.data_loader import DataLoader
-    success = DataLoader.archive_article_to_category(article_to_archive, category, tool_tags)
+    from ...services.database_write_service import DatabaseWriteService
+    success = await DatabaseWriteService.archive_article_to_category(article_to_archive, category, tool_tags)
     
     if not success:
         raise HTTPException(status_code=500, detail="归档失败，请查看服务器日志")
@@ -558,7 +563,8 @@ async def accept_tool_candidate(request: dict, admin: None = Depends(_require_ad
         }
         
         # 保存到对应的分类文件
-        success = DataLoader.archive_tool_to_category(tool_data, category or tool_to_accept.category)
+        from ...services.database_write_service import DatabaseWriteService
+        success = await DatabaseWriteService.archive_tool_to_category(tool_data, category or tool_to_accept.category)
         
         if not success:
             # 如果保存失败，恢复候选池
@@ -975,7 +981,8 @@ async def delete_article(request: DeleteArticleRequest, admin: None = Depends(_r
         deletion_results["from_pool"] = success
         
         # 2. 从所有归档分类文件中删除
-        category_results = DataLoader.delete_article_from_all_categories(url)
+        from ...services.database_write_service import DatabaseWriteService
+        category_results = await DatabaseWriteService.delete_article_from_all_categories(url)
         deletion_results["from_categories"] = category_results
         
         # 3. 从周报中删除
@@ -1050,7 +1057,8 @@ async def archive_article_from_pool(request: ArchiveArticleFromPoolRequest, admi
     
     # 检查文章是否已归档
     from ...services.data_loader import DataLoader
-    if DataLoader.is_article_archived(url):
+    from ...services.database_data_service import DatabaseDataService
+    if await DatabaseDataService.is_article_archived(url):
         raise HTTPException(status_code=400, detail="文章已归档，无法重复归档")
     
     # 从文章池中查找文章
@@ -1076,7 +1084,8 @@ async def archive_article_from_pool(request: ArchiveArticleFromPoolRequest, admi
         raise HTTPException(status_code=404, detail="在文章池中未找到该文章")
     
     # 使用DataLoader归档文章
-    success = DataLoader.archive_article_to_category(article_to_archive, category, tool_tags)
+    from ...services.database_write_service import DatabaseWriteService
+    success = await DatabaseWriteService.archive_article_to_category(article_to_archive, category, tool_tags)
     
     if not success:
         raise HTTPException(status_code=500, detail="归档失败，请查看服务器日志")
@@ -1183,6 +1192,25 @@ async def update_env_config(request: dict, admin: None = Depends(_require_admin)
             "wecom_webhook": load_env_var("WECOM_WEBHOOK"),
         }
     }
+
+
+@router.post("/backup/export-to-github")
+async def manual_backup_to_github(admin: None = Depends(_require_admin)):
+    """
+    手动备份数据到GitHub（从数据库导出JSON并推送到GitHub）
+    仅限管理员访问
+    """
+    try:
+        logger.info("[手动备份] 管理员触发数据备份")
+        backup_service = WeeklyBackupService()
+        await backup_service.backup_to_github()
+        return {
+            "ok": True,
+            "message": "数据备份任务已启动，请查看日志了解执行结果"
+        }
+    except Exception as e:
+        logger.error(f"[手动备份] 备份失败: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"备份失败: {str(e)}")
 
 
 @router.post("/test/rss")
@@ -1928,6 +1956,7 @@ async def digest_panel():
             <button class="flex-1 px-3 py-2 rounded-lg border border-gray-300 bg-gray-50 text-gray-900 text-sm font-medium config-menu-btn" data-section="schedule">调度</button>
             <button class="flex-1 px-3 py-2 rounded-lg border border-gray-300 bg-gray-50 text-gray-900 text-sm font-medium config-menu-btn" data-section="template">企业微信模板</button>
             <button class="flex-1 px-3 py-2 rounded-lg border border-gray-300 bg-gray-50 text-gray-900 text-sm font-medium config-menu-btn" data-section="env">系统配置</button>
+            <button class="flex-1 px-3 py-2 rounded-lg border border-gray-300 bg-gray-50 text-gray-900 text-sm font-medium config-menu-btn" data-section="backup">数据备份</button>
           </div>
 
           <div id="config-keywords-section" class="config-section block">
@@ -2010,6 +2039,31 @@ async def digest_panel():
               <button class="px-4 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 transition-colors" id="save-env-btn">保存系统配置</button>
             </div>
             <div class="mt-3 text-sm" id="config-env-status"></div>
+          </div>
+
+          <div id="config-backup-section" class="config-section hidden">
+            <div class="mb-4">
+              <h3 class="text-lg font-semibold text-gray-900 mb-2">数据备份</h3>
+              <p class="text-sm text-gray-600 mb-4">
+                将数据库中的所有数据导出为JSON文件，并推送到GitHub仓库进行备份。
+                备份包括：文章、工具、提示词、规则、社区资源等所有数据。
+              </p>
+              <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+                <p class="text-sm text-blue-800">
+                  <strong>备份说明：</strong><br />
+                  • 备份会从数据库导出所有数据到 <code>data/</code> 目录<br />
+                  • 然后自动提交并推送到GitHub仓库<br />
+                  • 备份过程可能需要几分钟，请耐心等待<br />
+                  • 备份完成后可以在GitHub仓库查看备份文件
+                </p>
+              </div>
+            </div>
+            <div class="flex gap-2">
+              <button class="px-4 py-2 bg-purple-600 text-white text-sm rounded-lg hover:bg-purple-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed" id="backup-to-github-btn">
+                <span id="backup-btn-text">备份数据到GitHub</span>
+              </button>
+            </div>
+            <div class="mt-3 text-sm" id="config-backup-status"></div>
           </div>
         </div>
       </div>
@@ -3511,8 +3565,66 @@ async def digest_panel():
           }
         }
 
+        async function backupToGitHub() {
+          const btn = document.getElementById("backup-to-github-btn");
+          const statusEl = document.getElementById("config-backup-status");
+          const btnText = document.getElementById("backup-btn-text");
+          
+          if (!btn || !statusEl) return;
+          
+          // 禁用按钮
+          btn.disabled = true;
+          if (btnText) btnText.textContent = "备份中...";
+          
+          if (statusEl) {
+            statusEl.textContent = "正在备份数据，请稍候...";
+            statusEl.className = "text-sm text-blue-600";
+          }
+          
+          try {
+            const adminCode = getAdminCode();
+            const res = await fetch("./backup/export-to-github", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "X-Admin-Code": adminCode || ""
+              }
+            });
+            
+            if (res.status === 401 || res.status === 403) {
+              handleAuthError(statusEl);
+              return;
+            }
+            
+            if (!res.ok) {
+              const errorData = await res.json().catch(() => ({ detail: "备份失败" }));
+              throw new Error(errorData.detail || "HTTP " + res.status);
+            }
+            
+            const data = await res.json();
+            if (data.ok) {
+              if (statusEl) {
+                statusEl.textContent = "✅ 备份任务已启动，请查看服务器日志了解执行结果";
+                statusEl.className = "text-sm text-green-600";
+              }
+            } else {
+              throw new Error(data.message || "备份失败");
+            }
+          } catch (err) {
+            console.error("备份失败:", err);
+            if (statusEl) {
+              statusEl.textContent = "❌ 备份失败: " + err.message;
+              statusEl.className = "text-sm text-red-600";
+            }
+          } finally {
+            // 恢复按钮
+            btn.disabled = false;
+            if (btnText) btnText.textContent = "备份数据到GitHub";
+          }
+        }
+
         function switchConfigSection(sectionName) {
-          const sections = ["keywords", "schedule", "template", "env"];
+          const sections = ["keywords", "schedule", "template", "env", "backup"];
           const menuBtns = document.querySelectorAll(".config-menu-btn");
           
           sections.forEach(function(name) {
@@ -3775,6 +3887,10 @@ async def digest_panel():
         document.getElementById("save-schedule-btn").addEventListener("click", saveScheduleConfig);
         document.getElementById("save-template-btn").addEventListener("click", saveWecomTemplateConfig);
         document.getElementById("save-env-btn").addEventListener("click", saveEnvConfig);
+        const backupBtn = document.getElementById("backup-to-github-btn");
+        if (backupBtn) {
+          backupBtn.addEventListener("click", backupToGitHub);
+        }
 
         // ========== 微信公众号草稿箱功能已暂时屏蔽 ==========
         // 以下函数暂时屏蔽，但保留代码以便后续启用
