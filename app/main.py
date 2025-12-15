@@ -75,6 +75,10 @@ async def lifespan(app: FastAPI):
     # 创建服务实例
     digest_service = DigestService()
     backup_service = BackupService()
+    
+    # 导入 DevMaster 资讯服务
+    from app.services.devmaster_news_service import DevMasterNewsService
+    devmaster_service = DevMasterNewsService()
 
     # 配置推送任务触发器
     if schedule.cron:
@@ -152,6 +156,15 @@ async def lifespan(app: FastAPI):
     #     job_id="daily_data_backup",
     # )
     # logger.info("[调度器] 已添加数据备份任务，每日 23:00 执行（备份config目录）")
+    
+    # 添加 DevMaster 资讯抓取任务：每天 11:00 执行
+    scheduler_manager.add_cron_job(
+        devmaster_service.crawl_and_archive_today_news,
+        hour=11,
+        minute=0,
+        job_id="daily_devmaster_news",
+    )
+    logger.info("[调度器] 已添加 DevMaster 资讯抓取任务，每日 11:00 执行")
     
     # 启动调度器
     scheduler_manager.start()
