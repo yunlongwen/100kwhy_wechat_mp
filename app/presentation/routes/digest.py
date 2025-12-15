@@ -380,8 +380,7 @@ async def accept_candidate(request: CandidateActionRequest, admin: None = Depend
             save_candidate_pool(candidates)
             raise HTTPException(status_code=500, detail="归档文章失败")
         
-        # 更新周报
-        update_weekly_digest()
+        # 注意：update_weekly_digest() 已在 archive_article_to_category() 中自动调用
         
         return {"ok": True, "message": "文章已成功归档到编程资讯。"}
     else:
@@ -488,9 +487,7 @@ async def archive_candidate(request: ArchiveArticleRequest, admin: None = Depend
     if not success:
         raise HTTPException(status_code=500, detail="归档失败，请查看服务器日志")
     
-    # 更新周报
-    update_weekly_digest()
-    
+    # 注意：update_weekly_digest() 已在 archive_article_to_category() 中自动调用
     # 注意：归档后不删除候选池中的文章，保留以便后续采纳
     
     return {"ok": True, "message": f"文章已成功归档到 {category} 分类。文章仍保留在候选池中，可继续采纳。"}
@@ -991,7 +988,7 @@ async def delete_article(request: DeleteArticleRequest, admin: None = Depends(_r
         deletion_results["from_weekly"] = weekly_success
         
         # 4. 更新周报（重新生成）
-        update_weekly_digest()
+        await update_weekly_digest()
         
         # 检查是否有任何删除成功
         any_success = (
@@ -1090,8 +1087,7 @@ async def archive_article_from_pool(request: ArchiveArticleFromPoolRequest, admi
     if not success:
         raise HTTPException(status_code=500, detail="归档失败，请查看服务器日志")
     
-    # 更新周报
-    update_weekly_digest()
+    # 注意：update_weekly_digest() 已在 archive_article_to_category() 中自动调用
     
     return {"ok": True, "message": f"文章已成功归档到 {category} 分类。文章仍保留在文章池中，可继续用于推送。"}
 

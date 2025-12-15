@@ -94,6 +94,15 @@ class DatabaseWriteService:
                     logger.info(f"添加文章: {url[:60]}...")
                 
                 await session.commit()
+                
+                # 更新周报
+                try:
+                    from app.services.weekly_digest import update_weekly_digest
+                    await update_weekly_digest()
+                except Exception as weekly_error:
+                    # 周报更新失败不应该影响归档操作
+                    logger.warning(f"更新周报失败: {weekly_error}", exc_info=True)
+                
                 return True
                 
         except Exception as e:

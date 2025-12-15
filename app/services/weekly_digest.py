@@ -9,6 +9,8 @@ from datetime import datetime, timedelta
 from typing import List, Dict, Optional
 from loguru import logger
 
+from app.services.database_data_service import DatabaseDataService
+
 # 数据目录路径
 DATA_DIR = Path(__file__).resolve().parent.parent.parent / "data"
 WEEKLY_DIR = DATA_DIR / "weekly"
@@ -64,9 +66,14 @@ def get_weekly_filepath(year: int, week: int) -> Path:
     return WEEKLY_DIR / filename
 
 
-def get_this_week_articles() -> Dict[str, List[Dict]]:
+async def get_this_week_articles(year: Optional[int] = None, week: Optional[int] = None) -> Dict[str, List[Dict]]:
     """
-    获取本周新增的资讯（AI资讯和编程资讯）
+    获取指定周或本周新增的资讯（AI资讯和编程资讯）
+    从数据库读取数据
+    
+    Args:
+        year: 年份，如果为None则使用当前年份
+        week: 周数，如果为None则使用当前周数
     
     Returns:
         {
@@ -74,32 +81,38 @@ def get_this_week_articles() -> Dict[str, List[Dict]]:
             "programming": [...]  # 编程资讯列表
         }
     """
-    year, week = get_week_number()
+    # 如果没有指定年份和周数，使用当前周
+    if year is None or week is None:
+        year, week = get_week_number()
     
-    # 计算本周的开始时间（周一 00:00:00）
-    today = datetime.now()
-    days_since_monday = today.weekday()  # 0=Monday, 6=Sunday
-    week_start = today - timedelta(days=days_since_monday)
+    # 根据年份和周数计算该周的日期范围
+    # 使用 ISO 8601 标准：周一为一周开始
+    jan_4 = datetime(year, 1, 4)  # 第一周是包含1月4日的那一周
+    week_1_monday = jan_4 - timedelta(days=jan_4.weekday())
+    
+    # 计算目标周的周一和周日
+    week_start = week_1_monday + timedelta(weeks=week - 1)
     week_start = week_start.replace(hour=0, minute=0, second=0, microsecond=0)
-    
-    # 计算本周的结束时间（周日 23:59:59）
     week_end = week_start + timedelta(days=6, hours=23, minutes=59, seconds=59)
     
     logger.debug(f"[周报] 本周时间范围: {week_start} 到 {week_end}")
     
-    # 加载AI资讯
-    ai_news_file = ARTICLES_DIR / "ai_news.json"
-    ai_news = []
-    if ai_news_file.exists():
-        with open(ai_news_file, 'r', encoding='utf-8') as f:
-            ai_news = json.load(f)
+    # 从数据库获取AI资讯和编程资讯
+    # 由于需要获取所有文章然后筛选，我们使用较大的page_size来获取所有数据
+    # 或者分别获取两个分类的文章
+    ai_news_all, _ = await DatabaseDataService.get_articles(
+        category="ai_news",
+        page=1,
+        page_size=1000,  # 使用较大的page_size，假设每周不会超过1000篇
+        sort_by="archived_at"
+    )
     
-    # 加载编程资讯
-    programming_file = ARTICLES_DIR / "programming.json"
-    programming = []
-    if programming_file.exists():
-        with open(programming_file, 'r', encoding='utf-8') as f:
-            programming = json.load(f)
+    programming_all, _ = await DatabaseDataService.get_articles(
+        category="programming",
+        page=1,
+        page_size=1000,  # 使用较大的page_size，假设每周不会超过1000篇
+        sort_by="archived_at"
+    )
     
     # 筛选本周新增的资讯
     def is_this_week(article: Dict) -> bool:
@@ -139,8 +152,8 @@ def get_this_week_articles() -> Dict[str, List[Dict]]:
             logger.warning(f"[周报] 解析文章时间失败: {archived_at}, 错误: {e}")
             return False
     
-    ai_news_this_week = [a for a in ai_news if is_this_week(a)]
-    programming_this_week = [a for a in programming if is_this_week(a)]
+    ai_news_this_week = [a for a in ai_news_all if is_this_week(a)]
+    programming_this_week = [a for a in programming_all if is_this_week(a)]
     
     logger.info(f"[周报] 本周新增资讯: AI资讯 {len(ai_news_this_week)} 篇, 编程资讯 {len(programming_this_week)} 篇")
     
@@ -179,7 +192,7 @@ def format_article_for_wechat(article: Dict, index: int) -> str:
     return result
 
 
-def generate_weekly_markdown(year: int, week: int) -> str:
+async def generate_weekly_markdown(year: int, week: int) -> str:
     """
     生成周报Markdown内容
     
@@ -190,14 +203,18 @@ def generate_weekly_markdown(year: int, week: int) -> str:
     Returns:
         Markdown内容
     """
-    articles = get_this_week_articles()
+    articles = await get_this_week_articles(year, week)
     ai_news = articles["ai_news"]
     programming = articles["programming"]
     
-    # 计算本周的日期范围
-    today = datetime.now()
-    days_since_monday = today.weekday()
-    week_start = today - timedelta(days=days_since_monday)
+    # 根据年份和周数计算该周的日期范围
+    # 使用 ISO 8601 标准：周一为一周开始
+    # 找到该年第一周的第一天（周一）
+    jan_4 = datetime(year, 1, 4)  # 第一周是包含1月4日的那一周
+    week_1_monday = jan_4 - timedelta(days=jan_4.weekday())
+    
+    # 计算目标周的周一
+    week_start = week_1_monday + timedelta(weeks=week - 1)
     week_end = week_start + timedelta(days=6)
     
     week_start_str = week_start.strftime("%Y年%m月%d日")
@@ -375,7 +392,7 @@ def delete_article_from_weekly(url: str) -> bool:
         return False
 
 
-def update_weekly_digest() -> bool:
+async def update_weekly_digest() -> bool:
     """
     更新本周的周报Markdown文件
     当有资讯被采纳或归档时调用此函数
@@ -390,7 +407,7 @@ def update_weekly_digest() -> bool:
         logger.info(f"[周报] 开始更新周报: {get_weekly_filename(year, week)}")
         
         # 生成Markdown内容
-        markdown = generate_weekly_markdown(year, week)
+        markdown = await generate_weekly_markdown(year, week)
         
         # 保存到文件
         with open(filepath, 'w', encoding='utf-8') as f:
