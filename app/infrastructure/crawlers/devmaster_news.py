@@ -1,9 +1,76 @@
 """DevMaster.cn 资讯爬虫"""
 import asyncio
 from datetime import datetime
-from typing import List, Dict
+from typing import List, Dict, Optional
 from playwright.async_api import async_playwright, TimeoutError as PlaywrightTimeoutError
 from loguru import logger
+
+
+async def extract_author_from_url(page, url: str) -> str:
+    """
+    从资讯详情页提取作者信息
+    
+    Args:
+        page: Playwright page 对象
+        url: 资讯详情页 URL
+        
+    Returns:
+        作者名称，如果获取不到返回 "100kWhy"
+    """
+    try:
+        # 如果 URL 是分类页面，直接返回默认值
+        if "news?category=" in url:
+            return "100kWhy"
+        
+        logger.debug(f"[DevMaster爬虫] 访问详情页获取作者: {url}")
+        
+        # 访问详情页
+        await page.goto(url, wait_until="domcontentloaded", timeout=15000)
+        await page.wait_for_timeout(1000)
+        
+        # 尝试多种选择器提取作者
+        author_selectors = [
+            "[class*='author']",
+            "[class*='writer']",
+            "[class*='creator']",
+            "meta[name='author']",
+            "[data-author]",
+            ".meta [class*='name']",
+            ".article-meta [class*='name']",
+        ]
+        
+        for selector in author_selectors:
+            try:
+                if selector.startswith("meta"):
+                    # meta 标签
+                    elem = await page.query_selector(selector)
+                    if elem:
+                        author = await elem.get_attribute("content")
+                        if author and len(author.strip()) > 0:
+                            author = author.strip()
+                            logger.debug(f"[DevMaster爬虫] 找到作者 (meta): {author}")
+                            return author
+                else:
+                    # 普通元素
+                    elem = await page.query_selector(selector)
+                    if elem:
+                        author = await elem.inner_text()
+                        if author and len(author.strip()) > 0:
+                            author = author.strip()
+                            # 过滤掉一些无效的作者名
+                            if author not in ["作者", "来源", "Author", "By"]:
+                                logger.debug(f"[DevMaster爬虫] 找到作者: {author}")
+                                return author
+            except Exception as e:
+                logger.debug(f"[DevMaster爬虫] 尝试选择器 {selector} 失败: {e}")
+                continue
+        
+        logger.debug(f"[DevMaster爬虫] 未找到作者信息，使用默认值")
+        return "100kWhy"
+        
+    except Exception as e:
+        logger.debug(f"[DevMaster爬虫] 提取作者失败: {e}")
+        return "100kWhy"
 
 
 async def fetch_devmaster_news_by_category(category_url: str, category_name: str) -> List[Dict]:
@@ -78,14 +145,17 @@ async def fetch_devmaster_news_by_category(category_url: str, category_name: str
                         summary = summary.strip()[:200]  # 限制长度
                     
                     if title and len(title) > 5:  # 确保标题有效
+                        # 提取作者（从详情页获取）
+                        author = await extract_author_from_url(page, url)
+                        
                         news_list.append({
                             "title": title,
                             "url": url,
                             "summary": summary,
-                            "source": "DevMaster",
+                            "source": author,  # 使用提取的作者作为来源
                             "published_time": datetime.now().isoformat() + "Z",
                         })
-                        logger.info(f"[DevMaster爬虫] 发现资讯: {title[:50]}...")
+                        logger.info(f"[DevMaster爬虫] 发现资讯: {title[:50]}... (作者: {author})")
                     
                 except Exception as e:
                     logger.debug(f"[DevMaster爬虫] 解析文章元素失败: {e}")
